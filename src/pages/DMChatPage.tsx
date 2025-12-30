@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AnonUser, DirectMessage } from '@/types/database';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import GameSelector from '@/components/games/GameSelector';
 
 const DMChatPage = () => {
   const { recipientId } = useParams();
@@ -246,6 +247,16 @@ const DMChatPage = () => {
       {/* Input */}
       <div className="border-t border-border bg-card/50 backdrop-blur-sm p-4">
         <div className="max-w-3xl mx-auto flex items-center gap-3">
+          <GameSelector 
+            playerName={user.username} 
+            onSendMessage={(msg) => {
+              supabase.from('direct_messages').insert({
+                sender_id: user.id,
+                receiver_id: recipientId,
+                content: msg,
+              });
+            }}
+          />
           <input
             type="text"
             value={newMessage}

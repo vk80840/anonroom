@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       anon_users: {
         Row: {
+          avatar_url: string | null
           bio: string | null
           birthday: string | null
           created_at: string
@@ -28,6 +29,7 @@ export type Database = {
           username: string
         }
         Insert: {
+          avatar_url?: string | null
           bio?: string | null
           birthday?: string | null
           created_at?: string
@@ -40,6 +42,7 @@ export type Database = {
           username: string
         }
         Update: {
+          avatar_url?: string | null
           bio?: string | null
           birthday?: string | null
           created_at?: string

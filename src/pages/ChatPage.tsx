@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Group, Message, AnonUser } from '@/types/database';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import GameSelector from '@/components/games/GameSelector';
 
 const ChatPage = () => {
   const { groupId } = useParams();
@@ -283,6 +284,16 @@ const ChatPage = () => {
       {/* Input */}
       <div className="border-t border-border bg-card/50 backdrop-blur-sm p-4">
         <div className="max-w-3xl mx-auto flex items-center gap-3">
+          <GameSelector 
+            playerName={user.username} 
+            onSendMessage={(msg) => {
+              supabase.from('messages').insert({
+                group_id: groupId,
+                user_id: user.id,
+                content: msg,
+              });
+            }}
+          />
           <input
             type="text"
             value={newMessage}
