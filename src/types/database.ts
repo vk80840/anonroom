@@ -3,6 +3,10 @@ export interface AnonUser {
   username: string;
   created_at: string;
   last_seen_at: string | null;
+  bio?: string | null;
+  birthday?: string | null;
+  links?: string[];
+  security_question?: string | null;
 }
 
 export interface Group {
@@ -11,6 +15,7 @@ export interface Group {
   description: string | null;
   created_by: string;
   invite_code: string;
+  custom_code?: string | null;
   created_at: string;
 }
 
@@ -40,4 +45,28 @@ export interface DirectMessage {
   content: string;
   created_at: string;
   read_at: string | null;
+}
+
+export interface Channel {
+  id: string;
+  name: string;
+  description: string | null;
+  created_by: string;
+  created_at: string;
+  member_count: number;
+}
+
+export interface ChannelMember {
+  id: string;
+  channel_id: string;
+  user_id: string;
+  joined_at: string;
+}
+
+export interface ChannelMessage {
+  id: string;
+  channel_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
 }
