@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Copy, LogOut, MessageCircle } from 'lucide-react';
+import { Plus, Users, Copy, LogOut, MessageCircle, UserCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -158,6 +158,14 @@ const GroupsPage = () => {
           </div>
           
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/dm')}
+              className="border-border"
+            >
+              <UserCircle className="w-4 h-4 mr-2" />
+              Direct Messages
+            </Button>
             <Button
               variant="outline"
               onClick={() => navigate('/join')}
