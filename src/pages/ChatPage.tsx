@@ -5,10 +5,16 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/use-toast';
-import { Group, Message, AnonUser } from '@/types/database';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { Group, Message } from '@/types/database';
 import GameSelector from '@/components/games/GameSelector';
+import MessageBubble from '@/components/chat/MessageBubble';
+import ReplyPreview from '@/components/chat/ReplyPreview';
+
+interface MessageWithUser extends Message {
+  username: string;
+  reply_to_id?: string | null;
+  replyTo?: { content: string; username: string } | null;
+}
 
 const ChatPage = () => {
   const { groupId } = useParams();
@@ -17,11 +23,12 @@ const ChatPage = () => {
   const { toast } = useToast();
   
   const [group, setGroup] = useState<Group | null>(null);
-  const [messages, setMessages] = useState<(Message & { username: string })[]>([]);
+  const [messages, setMessages] = useState<MessageWithUser[]>([]);
   const [members, setMembers] = useState<{ user_id: string; username: string }[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<MessageWithUser | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,40 +37,40 @@ const ChatPage = () => {
       return;
     }
     if (!groupId) {
-      navigate('/groups');
+      navigate('/');
       return;
     }
     
     fetchGroupData();
     
-    // Subscribe to new messages
     const channel = supabase
       .channel(`messages-${groupId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `group_id=eq.${groupId}`,
-        },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `group_id=eq.${groupId}` },
         async (payload) => {
-          const newMsg = payload.new as Message;
-          // Fetch username for the new message
-          const { data: userData } = await supabase
-            .from('anon_users_public')
-            .select('username')
-            .eq('id', newMsg.user_id)
-            .single();
-          
-          setMessages((prev) => [...prev, { ...newMsg, username: userData?.username || 'Unknown' }]);
+          if (payload.eventType === 'INSERT') {
+            const newMsg = payload.new as Message & { reply_to_id?: string };
+            const { data: userData } = await supabase.from('anon_users_public').select('username').eq('id', newMsg.user_id).single();
+            
+            let replyTo = null;
+            if (newMsg.reply_to_id) {
+              const { data: replyMsg } = await supabase.from('messages').select('content, user_id').eq('id', newMsg.reply_to_id).single();
+              if (replyMsg) {
+                const { data: replyUser } = await supabase.from('anon_users_public').select('username').eq('id', replyMsg.user_id).single();
+                replyTo = { content: replyMsg.content, username: replyUser?.username || 'Unknown' };
+              }
+            }
+            
+            setMessages((prev) => [...prev, { ...newMsg, username: userData?.username || 'Unknown', replyTo }]);
+          } else if (payload.eventType === 'UPDATE') {
+            setMessages((prev) => prev.map(m => m.id === payload.new.id ? { ...m, content: payload.new.content } : m));
+          } else if (payload.eventType === 'DELETE') {
+            setMessages((prev) => prev.filter(m => m.id !== payload.old.id));
+          }
         }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [user, groupId, navigate]);
 
   useEffect(() => {
@@ -74,80 +81,42 @@ const ChatPage = () => {
     if (!groupId || !user) return;
 
     try {
-      // Check if user is a member
-      const { data: membership } = await supabase
-        .from('group_members')
-        .select('id')
-        .eq('group_id', groupId)
-        .eq('user_id', user.id)
-        .limit(1);
-
+      const { data: membership } = await supabase.from('group_members').select('id').eq('group_id', groupId).eq('user_id', user.id).limit(1);
       if (!membership || membership.length === 0) {
-        toast({
-          title: "Access denied",
-          description: "You're not a member of this group",
-          variant: "destructive",
-        });
-        navigate('/groups');
+        toast({ title: "Access denied", description: "You're not a member of this group", variant: "destructive" });
+        navigate('/');
         return;
       }
 
-      // Fetch group
-      const { data: groupData, error: groupError } = await supabase
-        .from('groups')
-        .select('*')
-        .eq('id', groupId)
-        .single();
-
-      if (groupError) throw groupError;
+      const { data: groupData } = await supabase.from('groups').select('*').eq('id', groupId).single();
       setGroup(groupData);
 
-      // Fetch members with usernames
-      const { data: membersData } = await supabase
-        .from('group_members')
-        .select('user_id')
-        .eq('group_id', groupId);
-
+      const { data: membersData } = await supabase.from('group_members').select('user_id').eq('group_id', groupId);
       if (membersData) {
         const userIds = membersData.map(m => m.user_id);
-        const { data: usersData } = await supabase
-          .from('anon_users_public')
-          .select('id, username')
-          .in('id', userIds);
-        
+        const { data: usersData } = await supabase.from('anon_users_public').select('id, username').in('id', userIds);
         setMembers(usersData?.map(u => ({ user_id: u.id, username: u.username })) || []);
       }
 
-      // Fetch messages with usernames
-      const { data: messagesData, error: messagesError } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('group_id', groupId)
-        .order('created_at', { ascending: true });
-
-      if (messagesError) throw messagesError;
-
-      // Get usernames for all messages
+      const { data: messagesData } = await supabase.from('messages').select('*').eq('group_id', groupId).order('created_at', { ascending: true });
       const userIds = [...new Set(messagesData?.map(m => m.user_id) || [])];
-      const { data: usersData } = await supabase
-        .from('anon_users_public')
-        .select('id, username')
-        .in('id', userIds);
-
+      const { data: usersData } = await supabase.from('anon_users_public').select('id, username').in('id', userIds);
       const usernameMap = new Map(usersData?.map(u => [u.id, u.username]) || []);
       
-      setMessages(
-        messagesData?.map(m => ({
-          ...m,
-          username: usernameMap.get(m.user_id) || 'Unknown',
-        })) || []
-      );
+      const messagesWithReplies = await Promise.all((messagesData || []).map(async (m: any) => {
+        let replyTo = null;
+        if (m.reply_to_id) {
+          const replyMsg = messagesData?.find((msg: any) => msg.id === m.reply_to_id);
+          if (replyMsg) {
+            replyTo = { content: replyMsg.content, username: usernameMap.get(replyMsg.user_id) || 'Unknown' };
+          }
+        }
+        return { ...m, username: usernameMap.get(m.user_id) || 'Unknown', replyTo };
+      }));
+      
+      setMessages(messagesWithReplies);
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -155,61 +124,50 @@ const ChatPage = () => {
 
   const handleSend = async () => {
     if (!newMessage.trim() || !user || !groupId || sending) return;
-
     setSending(true);
     try {
-      const { error } = await supabase
-        .from('messages')
-        .insert({
-          group_id: groupId,
-          user_id: user.id,
-          content: newMessage.trim(),
-        });
-
+      const insertData: any = { group_id: groupId, user_id: user.id, content: newMessage.trim() };
+      if (replyingTo) insertData.reply_to_id = replyingTo.id;
+      
+      const { error } = await supabase.from('messages').insert(insertData);
       if (error) throw error;
       setNewMessage('');
+      setReplyingTo(null);
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setSending(false);
     }
   };
 
+  const handleEdit = async (messageId: string, newContent: string) => {
+    const { error } = await supabase.from('messages').update({ content: newContent }).eq('id', messageId);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+  };
+
+  const handleDelete = async (messageId: string) => {
+    const { error } = await supabase.from('messages').delete().eq('id', messageId);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+  };
+
   const copyInviteCode = () => {
     if (group) {
       navigator.clipboard.writeText(group.invite_code);
-      toast({
-        title: "Copied!",
-        description: "Invite code copied to clipboard",
-      });
+      toast({ title: "Copied!", description: "Invite code copied to clipboard" });
     }
   };
 
   if (!user || loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
+    return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">Loading...</p></div>;
   }
 
   if (!group) return null;
 
   return (
     <div className="h-screen bg-background flex flex-col">
-      {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/groups')}
-            className="text-muted-foreground hover:text-foreground"
-          >
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
@@ -220,96 +178,56 @@ const ChatPage = () => {
             </p>
           </div>
         </div>
-        
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={copyInviteCode}
-          className="border-border font-mono text-xs"
-        >
+        <Button variant="outline" size="sm" onClick={copyInviteCode} className="border-border font-mono text-xs">
           <Copy className="w-3 h-3 mr-2" />
           {group.invite_code}
         </Button>
       </header>
 
-      {/* Messages */}
       <main className="flex-1 overflow-y-auto p-4">
         <div className="max-w-3xl mx-auto space-y-3">
           {messages.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">No messages yet. Start the conversation!</p>
-            </div>
+            <div className="text-center py-12"><p className="text-muted-foreground">No messages yet. Start the conversation!</p></div>
           ) : (
-            messages.map((message) => {
-              const isOwn = message.user_id === user.id;
-              return (
-                <div
-                  key={message.id}
-                  className={cn(
-                    'flex flex-col gap-1 max-w-[75%] message-appear',
-                    isOwn ? 'ml-auto items-end' : 'items-start'
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      'font-mono text-xs',
-                      isOwn ? 'text-primary' : 'text-accent'
-                    )}>
-                      {isOwn ? 'You' : message.username}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {format(new Date(message.created_at), 'HH:mm')}
-                    </span>
-                  </div>
-                  <div
-                    className={cn(
-                      'px-4 py-2.5 rounded-2xl',
-                      isOwn
-                        ? 'bg-message-own border border-primary/20 rounded-br-md'
-                        : 'bg-message-other border border-border rounded-bl-md'
-                    )}
-                  >
-                    <p className="text-sm text-foreground leading-relaxed break-words">
-                      {message.content}
-                    </p>
-                  </div>
-                </div>
-              );
-            })
+            messages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                id={message.id}
+                content={message.content}
+                username={message.username}
+                createdAt={message.created_at}
+                isOwn={message.user_id === user.id}
+                replyTo={message.replyTo}
+                onReply={() => setReplyingTo(message)}
+                onEdit={(newContent) => handleEdit(message.id, newContent)}
+                onDelete={() => handleDelete(message.id)}
+              />
+            ))
           )}
           <div ref={messagesEndRef} />
         </div>
       </main>
 
-      {/* Input */}
-      <div className="border-t border-border bg-card/50 backdrop-blur-sm p-4">
-        <div className="max-w-3xl mx-auto flex items-center gap-3">
-          <GameSelector 
-            playerName={user.username} 
-            onSendMessage={(msg) => {
-              supabase.from('messages').insert({
-                group_id: groupId,
-                user_id: user.id,
-                content: msg,
-              });
-            }}
-          />
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-            placeholder="Type your message..."
-            className="flex-1 px-4 py-3 bg-input border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-mono text-sm"
-            maxLength={500}
-          />
-          <Button
-            onClick={handleSend}
-            disabled={!newMessage.trim() || sending}
-            className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 chat-glow"
-          >
-            <Send className="w-5 h-5" />
-          </Button>
+      <div className="border-t border-border bg-card/50 backdrop-blur-sm">
+        {replyingTo && (
+          <ReplyPreview username={replyingTo.username} content={replyingTo.content} onCancel={() => setReplyingTo(null)} />
+        )}
+        <div className="p-4">
+          <div className="max-w-3xl mx-auto flex items-center gap-3">
+            <GameSelector playerName={user.username} onSendMessage={(msg) => { supabase.from('messages').insert({ group_id: groupId, user_id: user.id, content: msg }); }} />
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+              placeholder="Type your message..."
+              className="flex-1 px-4 py-3 bg-input border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-mono text-sm"
+              maxLength={500}
+            />
+            <Button onClick={handleSend} disabled={!newMessage.trim() || sending} className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 chat-glow">
+              <Send className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

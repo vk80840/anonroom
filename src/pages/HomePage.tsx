@@ -1,312 +1,482 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Users, Shield, Hash, Zap, Lock, UserCircle, Search, Settings } from 'lucide-react';
+import { MessageCircle, Users, Shield, Hash, Plus, Settings, Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/integrations/supabase/client';
-import { GlobalSearch } from '@/components/GlobalSearch';
-import { Channel, Group } from '@/types/database';
+import { Channel, Group, AnonUser, DirectMessage } from '@/types/database';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
-interface DMConversation {
-  recipientId: string;
-  recipientUsername: string;
-  lastMessage: string;
-  lastMessageAt: string;
+interface Conversation {
+  id: string;
+  type: 'group' | 'dm' | 'channel';
+  name: string;
+  subtitle: string;
+  lastMessage?: string;
+  lastMessageAt?: string;
+  unreadCount?: number;
+  avatarUrl?: string;
 }
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [dmConversations, setDmConversations] = useState<DMConversation[]>([]);
+  const { user, logout } = useAuthStore();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<AnonUser[]>([]);
+  const [searching, setSearching] = useState(false);
+  
+  // Create dialogs
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [createChannelOpen, setCreateChannelOpen] = useState(false);
+  const [joinGroupOpen, setJoinGroupOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupDesc, setNewGroupDesc] = useState('');
+  const [newChannelName, setNewChannelName] = useState('');
+  const [newChannelDesc, setNewChannelDesc] = useState('');
+  const [joinCode, setJoinCode] = useState('');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    fetchChannels();
-    if (user) {
-      fetchGroups();
-      fetchDMs();
+    if (!user) {
+      navigate('/auth?mode=login');
+      return;
     }
-  }, [user]);
+    fetchAllConversations();
+  }, [user, navigate]);
 
-  const fetchChannels = async () => {
-    const { data } = await supabase
-      .from('channels')
-      .select('*')
-      .order('member_count', { ascending: false })
-      .limit(4);
-    setChannels(data || []);
-  };
-
-  const fetchGroups = async () => {
+  const fetchAllConversations = async () => {
     if (!user) return;
-    const { data: memberData } = await supabase
-      .from('group_members')
-      .select('group_id')
-      .eq('user_id', user.id);
-    
-    if (memberData?.length) {
-      const groupIds = memberData.map(m => m.group_id);
-      const { data } = await supabase
-        .from('groups')
+    setLoading(true);
+
+    try {
+      const allConversations: Conversation[] = [];
+
+      // Fetch groups user is member of
+      const { data: memberships } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .eq('user_id', user.id);
+
+      if (memberships?.length) {
+        const groupIds = memberships.map(m => m.group_id);
+        const { data: groups } = await supabase
+          .from('groups')
+          .select('*')
+          .in('id', groupIds);
+
+        groups?.forEach(group => {
+          allConversations.push({
+            id: group.id,
+            type: 'group',
+            name: group.name,
+            subtitle: group.description || 'Private group',
+          });
+        });
+      }
+
+      // Fetch DM conversations
+      const { data: dms } = await supabase
+        .from('direct_messages')
         .select('*')
-        .in('id', groupIds)
-        .limit(4);
-      setGroups(data || []);
-    }
-  };
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
 
-  const fetchDMs = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('direct_messages')
-      .select('*')
-      .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-      .order('created_at', { ascending: false });
-    
-    if (data) {
-      const convMap = new Map<string, DMConversation>();
-      for (const msg of data) {
-        const recipientId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
-        if (!convMap.has(recipientId)) {
-          convMap.set(recipientId, {
-            recipientId,
-            recipientUsername: '',
-            lastMessage: msg.content,
-            lastMessageAt: msg.created_at
+      if (dms?.length) {
+        const dmMap = new Map<string, { msg: DirectMessage; unread: number }>();
+        dms.forEach(msg => {
+          const partnerId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
+          if (!dmMap.has(partnerId)) {
+            dmMap.set(partnerId, { msg, unread: 0 });
+          }
+          if (msg.receiver_id === user.id && !msg.read_at) {
+            const entry = dmMap.get(partnerId);
+            if (entry) entry.unread++;
+          }
+        });
+
+        const partnerIds = Array.from(dmMap.keys());
+        if (partnerIds.length) {
+          const { data: users } = await supabase
+            .from('anon_users')
+            .select('id, username, avatar_url')
+            .in('id', partnerIds);
+
+          users?.forEach(u => {
+            const entry = dmMap.get(u.id);
+            if (entry) {
+              allConversations.push({
+                id: u.id,
+                type: 'dm',
+                name: u.username,
+                subtitle: entry.msg.content.slice(0, 40),
+                lastMessage: entry.msg.content,
+                lastMessageAt: entry.msg.created_at,
+                unreadCount: entry.unread,
+                avatarUrl: u.avatar_url || undefined,
+              });
+            }
           });
         }
       }
-      
-      const ids = Array.from(convMap.keys());
-      if (ids.length) {
-        const { data: users } = await supabase
-          .from('anon_users')
-          .select('id, username')
-          .in('id', ids);
-        
-        users?.forEach(u => {
-          const conv = convMap.get(u.id);
-          if (conv) conv.recipientUsername = u.username;
+
+      // Fetch channels user is member of
+      const { data: channelMemberships } = await supabase
+        .from('channel_members')
+        .select('channel_id')
+        .eq('user_id', user.id);
+
+      if (channelMemberships?.length) {
+        const channelIds = channelMemberships.map(m => m.channel_id);
+        const { data: channels } = await supabase
+          .from('channels')
+          .select('*')
+          .in('id', channelIds);
+
+        channels?.forEach(channel => {
+          allConversations.push({
+            id: channel.id,
+            type: 'channel',
+            name: `#${channel.name}`,
+            subtitle: channel.description || `${channel.member_count || 0} members`,
+          });
         });
       }
-      
-      setDmConversations(Array.from(convMap.values()).slice(0, 4));
+
+      // Sort by last message time for DMs, otherwise keep order
+      allConversations.sort((a, b) => {
+        if (a.lastMessageAt && b.lastMessageAt) {
+          return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+        }
+        if (a.lastMessageAt) return -1;
+        if (b.lastMessageAt) return 1;
+        return 0;
+      });
+
+      setConversations(allConversations);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleSearch = async () => {
+    if (!searchQuery.trim() || searchQuery.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    try {
+      const { data } = await supabase
+        .from('anon_users_public')
+        .select('*')
+        .ilike('username', `%${searchQuery.trim()}%`)
+        .neq('id', user?.id)
+        .limit(10);
+      setSearchResults(data || []);
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  useEffect(() => {
+    const debounce = setTimeout(() => handleSearch(), 300);
+    return () => clearTimeout(debounce);
+  }, [searchQuery]);
+
+  const handleCreateGroup = async () => {
+    if (!user || !newGroupName.trim()) return;
+    setCreating(true);
+    try {
+      const { data: group, error } = await supabase
+        .from('groups')
+        .insert({ name: newGroupName.trim(), description: newGroupDesc.trim() || null, created_by: user.id })
+        .select()
+        .single();
+      if (error) throw error;
+      await supabase.from('group_members').insert({ group_id: group.id, user_id: user.id });
+      setNewGroupName('');
+      setNewGroupDesc('');
+      setCreateGroupOpen(false);
+      fetchAllConversations();
+    } catch (error) {
+      console.error('Error creating group:', error);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleCreateChannel = async () => {
+    if (!user || !newChannelName.trim()) return;
+    setCreating(true);
+    try {
+      const { data: channel, error } = await supabase
+        .from('channels')
+        .insert({ name: newChannelName.trim(), description: newChannelDesc.trim() || null, created_by: user.id })
+        .select()
+        .single();
+      if (error) throw error;
+      await supabase.from('channel_members').insert({ channel_id: channel.id, user_id: user.id });
+      setNewChannelName('');
+      setNewChannelDesc('');
+      setCreateChannelOpen(false);
+      fetchAllConversations();
+    } catch (error) {
+      console.error('Error creating channel:', error);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleJoinGroup = async () => {
+    if (!user || !joinCode.trim()) return;
+    setCreating(true);
+    try {
+      const { data: group } = await supabase
+        .from('groups')
+        .select('*')
+        .or(`invite_code.eq.${joinCode.trim()},custom_code.eq.${joinCode.trim().toLowerCase()}`)
+        .single();
+      
+      if (!group) {
+        alert('Group not found');
+        return;
+      }
+
+      const { data: existing } = await supabase
+        .from('group_members')
+        .select('id')
+        .eq('group_id', group.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!existing) {
+        await supabase.from('group_members').insert({ group_id: group.id, user_id: user.id });
+      }
+      
+      setJoinCode('');
+      setJoinGroupOpen(false);
+      navigate(`/chat/${group.id}`);
+    } catch (error) {
+      console.error('Error joining group:', error);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const navigateToConversation = (conv: Conversation) => {
+    switch (conv.type) {
+      case 'group':
+        navigate(`/chat/${conv.id}`);
+        break;
+      case 'dm':
+        navigate(`/dm/${conv.id}`);
+        break;
+      case 'channel':
+        navigate(`/channel/${conv.id}`);
+        break;
+    }
+  };
+
+  const getIcon = (type: Conversation['type']) => {
+    switch (type) {
+      case 'group': return Users;
+      case 'dm': return User;
+      case 'channel': return Hash;
+    }
+  };
+
+  const getIconBg = (type: Conversation['type']) => {
+    switch (type) {
+      case 'group': return 'bg-blue-500/20 text-blue-500';
+      case 'dm': return 'bg-purple-500/20 text-purple-500';
+      case 'channel': return 'bg-green-500/20 text-green-500';
+    }
+  };
+
+  const filteredConversations = conversations.filter(c =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (!user) return null;
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Shield className="w-6 h-6 text-primary" />
-            <span className="font-bold text-foreground">AnonChat</span>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <GlobalSearch />
-            {user ? (
-              <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
-                <Settings className="w-5 h-5" />
-              </Button>
-            ) : (
-              <>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/auth?mode=login')}>Login</Button>
-                <Button size="sm" onClick={() => navigate('/auth?mode=signup')}>Sign Up</Button>
-              </>
-            )}
-          </div>
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Shield className="w-6 h-6 text-primary" />
+          <span className="font-bold text-foreground">AnonChat</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
+            <Settings className="w-5 h-5" />
+          </Button>
         </div>
       </header>
 
-      {/* Hero */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-accent/10" />
-        <div className="container mx-auto px-4 py-12 sm:py-16 relative">
-          <div className="max-w-3xl mx-auto text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-4 leading-tight">
-              Chat Without <span className="text-primary">Identity</span>
-            </h1>
-            <p className="text-muted-foreground mb-6">No email. No phone. Just a username and password.</p>
+      {/* Search */}
+      <div className="p-4 border-b border-border">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search chats or users..."
+            className="pl-10 bg-input border-border"
+          />
+        </div>
+      </div>
 
-            {!user && (
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Button size="lg" onClick={() => navigate('/auth?mode=signup')} className="chat-glow">
-                  Get Started Free
-                </Button>
-                <Button size="lg" variant="outline" onClick={() => navigate('/auth?mode=login')}>
-                  Sign In
-                </Button>
-              </div>
-            )}
+      {/* User Search Results */}
+      {searchQuery.length >= 2 && searchResults.length > 0 && (
+        <div className="px-4 py-2 border-b border-border bg-card/50">
+          <p className="text-xs text-muted-foreground mb-2">Users</p>
+          <div className="space-y-1">
+            {searchResults.map(u => (
+              <button
+                key={u.id}
+                onClick={() => navigate(`/dm/${u.id}`)}
+                className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-primary/10 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                  <User className="w-4 h-4 text-purple-500" />
+                </div>
+                <span className="font-mono text-sm text-foreground">{u.username}</span>
+              </button>
+            ))}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Main Content - Groups, DMs, Channels */}
-      <div className="container mx-auto px-4 py-6 space-y-8">
-        {/* Groups Section */}
-        <Section
-          title="Groups"
-          icon={Users}
-          viewAllPath="/groups"
-          emptyText={user ? "No groups yet" : "Login to see your groups"}
-        >
-          {groups.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {groups.map(group => (
-                <ItemCard
-                  key={group.id}
-                  icon={Users}
-                  iconColor="text-blue-500"
-                  iconBg="bg-blue-500/10"
-                  title={group.name}
-                  subtitle={group.description || 'Private group'}
-                  onClick={() => navigate(`/chat/${group.id}`)}
-                />
-              ))}
-            </div>
-          ) : user ? (
-            <EmptyState icon={Users} text="Join or create a group" action={() => navigate('/groups')} />
-          ) : null}
-        </Section>
+      {/* Conversations List */}
+      <main className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        ) : filteredConversations.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+            <MessageCircle className="w-16 h-16 text-muted-foreground mb-4" />
+            <h2 className="text-lg font-semibold text-foreground mb-2">No conversations yet</h2>
+            <p className="text-sm text-muted-foreground mb-4">Create or join a group, channel, or start a DM</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {filteredConversations.map(conv => {
+              const Icon = getIcon(conv.type);
+              return (
+                <button
+                  key={`${conv.type}-${conv.id}`}
+                  onClick={() => navigateToConversation(conv)}
+                  className="w-full flex items-center gap-3 p-4 hover:bg-primary/5 transition-colors text-left"
+                >
+                  <div className={cn('w-12 h-12 rounded-full flex items-center justify-center relative', getIconBg(conv.type))}>
+                    {conv.avatarUrl ? (
+                      <img src={conv.avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                      <Icon className="w-6 h-6" />
+                    )}
+                    {conv.unreadCount && conv.unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full text-xs flex items-center justify-center text-primary-foreground font-medium">
+                        {conv.unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-foreground truncate">{conv.name}</p>
+                      {conv.lastMessageAt && (
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(conv.lastMessageAt), 'MMM d')}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate">{conv.subtitle}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </main>
 
-        {/* Direct Messages Section */}
-        <Section
-          title="Direct Messages"
-          icon={MessageCircle}
-          viewAllPath="/dm"
-          emptyText={user ? "No messages yet" : "Login to see messages"}
-        >
-          {dmConversations.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {dmConversations.map(conv => (
-                <ItemCard
-                  key={conv.recipientId}
-                  icon={UserCircle}
-                  iconColor="text-purple-500"
-                  iconBg="bg-purple-500/10"
-                  title={conv.recipientUsername}
-                  subtitle={conv.lastMessage.slice(0, 30) + (conv.lastMessage.length > 30 ? '...' : '')}
-                  onClick={() => navigate(`/dm/${conv.recipientId}`)}
-                />
-              ))}
-            </div>
-          ) : user ? (
-            <EmptyState icon={MessageCircle} text="Start a conversation" action={() => navigate('/dm')} />
-          ) : null}
-        </Section>
+      {/* Bottom Action Bar */}
+      <div className="border-t border-border bg-card/50 p-4">
+        <div className="flex justify-center gap-3">
+          <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Users className="w-4 h-4" />
+                New Group
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader>
+                <DialogTitle>Create Group</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <Input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group name" className="bg-input" />
+                <Input value={newGroupDesc} onChange={(e) => setNewGroupDesc(e.target.value)} placeholder="Description (optional)" className="bg-input" />
+                <Button onClick={handleCreateGroup} disabled={!newGroupName.trim() || creating} className="w-full">
+                  {creating ? 'Creating...' : 'Create'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
-        {/* Channels Section */}
-        <Section
-          title="Channels"
-          icon={Hash}
-          viewAllPath="/channels"
-          emptyText="Explore public channels"
-        >
-          {channels.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {channels.map(channel => (
-                <ItemCard
-                  key={channel.id}
-                  icon={Hash}
-                  iconColor="text-green-500"
-                  iconBg="bg-green-500/10"
-                  title={`#${channel.name}`}
-                  subtitle={`${channel.member_count || 0} members`}
-                  onClick={() => navigate(`/channel/${channel.id}`)}
-                />
-              ))}
-            </div>
-          ) : (
-            <EmptyState icon={Hash} text="No channels yet" action={() => navigate('/channels')} />
-          )}
-        </Section>
-      </div>
+          <Dialog open={joinGroupOpen} onOpenChange={setJoinGroupOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Plus className="w-4 h-4" />
+                Join
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader>
+                <DialogTitle>Join Group</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <Input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="Enter invite code" className="bg-input font-mono" />
+                <Button onClick={handleJoinGroup} disabled={!joinCode.trim() || creating} className="w-full">
+                  {creating ? 'Joining...' : 'Join'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
-      {/* Features */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <FeatureCard icon={Lock} title="Secure" description="Encrypted passwords" />
-          <FeatureCard icon={Zap} title="Real-time" description="Instant delivery" />
-          <FeatureCard icon={Shield} title="Private" description="No tracking" />
+          <Dialog open={createChannelOpen} onOpenChange={setCreateChannelOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Hash className="w-4 h-4" />
+                New Channel
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader>
+                <DialogTitle>Create Channel</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <Input value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} placeholder="Channel name" className="bg-input" />
+                <Input value={newChannelDesc} onChange={(e) => setNewChannelDesc(e.target.value)} placeholder="Description (optional)" className="bg-input" />
+                <Button onClick={handleCreateChannel} disabled={!newChannelName.trim() || creating} className="w-full">
+                  {creating ? 'Creating...' : 'Create'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
-
-      {/* Footer */}
-      <footer className="border-t border-border py-4">
-        <div className="container mx-auto px-4 text-center text-muted-foreground text-sm">
-          <p>Anonymous Chat • No tracking</p>
-        </div>
-      </footer>
     </div>
   );
 };
-
-const Section = ({ title, icon: Icon, viewAllPath, children, emptyText }: {
-  title: string;
-  icon: any;
-  viewAllPath: string;
-  children: React.ReactNode;
-  emptyText: string;
-}) => {
-  const navigate = useNavigate();
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-          <Icon className="w-5 h-5 text-primary" />
-          {title}
-        </h2>
-        <Button variant="ghost" size="sm" onClick={() => navigate(viewAllPath)}>
-          View All
-        </Button>
-      </div>
-      {children}
-    </div>
-  );
-};
-
-const ItemCard = ({ icon: Icon, iconColor, iconBg, title, subtitle, onClick }: {
-  icon: any;
-  iconColor: string;
-  iconBg: string;
-  title: string;
-  subtitle: string;
-  onClick: () => void;
-}) => (
-  <button
-    onClick={onClick}
-    className="flex flex-col items-start p-3 bg-card border border-border rounded-xl hover:border-primary/30 transition-colors text-left w-full"
-  >
-    <div className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center mb-2`}>
-      <Icon className={`w-4 h-4 ${iconColor}`} />
-    </div>
-    <p className="font-medium text-foreground text-sm truncate w-full">{title}</p>
-    <p className="text-xs text-muted-foreground truncate w-full">{subtitle}</p>
-  </button>
-);
-
-const EmptyState = ({ icon: Icon, text, action }: { icon: any; text: string; action: () => void }) => (
-  <button
-    onClick={action}
-    className="w-full p-6 border border-dashed border-border rounded-xl hover:border-primary/30 transition-colors flex flex-col items-center gap-2"
-  >
-    <Icon className="w-6 h-6 text-muted-foreground" />
-    <span className="text-sm text-muted-foreground">{text}</span>
-  </button>
-);
-
-const FeatureCard = ({ icon: Icon, title, description }: { icon: any; title: string; description: string }) => (
-  <div className="bg-card border border-border rounded-xl p-4 text-center">
-    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center mx-auto mb-2">
-      <Icon className="w-4 h-4 text-primary" />
-    </div>
-    <h3 className="font-medium text-foreground text-sm">{title}</h3>
-    <p className="text-xs text-muted-foreground">{description}</p>
-  </div>
-);
 
 export default HomePage;

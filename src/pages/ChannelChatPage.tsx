@@ -6,9 +6,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/use-toast';
 import { Channel, ChannelMessage } from '@/types/database';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
 import GameSelector from '@/components/games/GameSelector';
+import MessageBubble from '@/components/chat/MessageBubble';
+import ReplyPreview from '@/components/chat/ReplyPreview';
+
+interface ChannelMessageWithUser extends ChannelMessage {
+  username: string;
+  reply_to_id?: string | null;
+  replyTo?: { content: string; username: string } | null;
+}
 
 const ChannelChatPage = () => {
   const { channelId } = useParams();
@@ -17,51 +23,48 @@ const ChannelChatPage = () => {
   const { toast } = useToast();
 
   const [channel, setChannel] = useState<Channel | null>(null);
-  const [messages, setMessages] = useState<(ChannelMessage & { username: string })[]>([]);
+  const [messages, setMessages] = useState<ChannelMessageWithUser[]>([]);
   const [memberCount, setMemberCount] = useState(0);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<ChannelMessageWithUser | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth?mode=login');
-      return;
-    }
-    if (!channelId) {
-      navigate('/channels');
-      return;
-    }
+    if (!user) { navigate('/auth?mode=login'); return; }
+    if (!channelId) { navigate('/'); return; }
 
     fetchData();
 
     const channelSub = supabase
       .channel(`channel-${channelId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'channel_messages',
-          filter: `channel_id=eq.${channelId}`,
-        },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'channel_messages', filter: `channel_id=eq.${channelId}` },
         async (payload) => {
-          const newMsg = payload.new as ChannelMessage;
-          const { data: userData } = await supabase
-            .from('anon_users_public')
-            .select('username')
-            .eq('id', newMsg.user_id)
-            .single();
-
-          setMessages((prev) => [...prev, { ...newMsg, username: userData?.username || 'Unknown' }]);
+          if (payload.eventType === 'INSERT') {
+            const newMsg = payload.new as ChannelMessage & { reply_to_id?: string };
+            const { data: userData } = await supabase.from('anon_users_public').select('username').eq('id', newMsg.user_id).single();
+            
+            let replyTo = null;
+            if (newMsg.reply_to_id) {
+              const { data: replyMsg } = await supabase.from('channel_messages').select('content, user_id').eq('id', newMsg.reply_to_id).single();
+              if (replyMsg) {
+                const { data: replyUser } = await supabase.from('anon_users_public').select('username').eq('id', replyMsg.user_id).single();
+                replyTo = { content: replyMsg.content, username: replyUser?.username || 'Unknown' };
+              }
+            }
+            
+            setMessages((prev) => [...prev, { ...newMsg, username: userData?.username || 'Unknown', replyTo }]);
+          } else if (payload.eventType === 'UPDATE') {
+            setMessages((prev) => prev.map(m => m.id === payload.new.id ? { ...m, content: payload.new.content } : m));
+          } else if (payload.eventType === 'DELETE') {
+            setMessages((prev) => prev.filter(m => m.id !== payload.old.id));
+          }
         }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channelSub);
-    };
+    return () => { supabase.removeChannel(channelSub); };
   }, [user, channelId, navigate]);
 
   useEffect(() => {
@@ -72,52 +75,35 @@ const ChannelChatPage = () => {
     if (!channelId || !user) return;
 
     try {
-      // Check membership
-      const { data: membership } = await supabase
-        .from('channel_members')
-        .select('id')
-        .eq('channel_id', channelId)
-        .eq('user_id', user.id)
-        .limit(1);
-
+      const { data: membership } = await supabase.from('channel_members').select('id').eq('channel_id', channelId).eq('user_id', user.id).limit(1);
       if (!membership || membership.length === 0) {
         toast({ title: "Not a member", description: "Join this channel first", variant: "destructive" });
-        navigate('/channels');
+        navigate('/');
         return;
       }
 
-      // Fetch channel
-      const { data: channelData, error } = await supabase
-        .from('channels')
-        .select('*')
-        .eq('id', channelId)
-        .single();
-
+      const { data: channelData, error } = await supabase.from('channels').select('*').eq('id', channelId).single();
       if (error) throw error;
       setChannel(channelData);
       setMemberCount(channelData.member_count);
 
-      // Fetch messages
-      const { data: messagesData } = await supabase
-        .from('channel_messages')
-        .select('*')
-        .eq('channel_id', channelId)
-        .order('created_at', { ascending: true });
-
+      const { data: messagesData } = await supabase.from('channel_messages').select('*').eq('channel_id', channelId).order('created_at', { ascending: true });
       const userIds = [...new Set(messagesData?.map(m => m.user_id) || [])];
-      const { data: usersData } = await supabase
-        .from('anon_users_public')
-        .select('id, username')
-        .in('id', userIds);
-
+      const { data: usersData } = await supabase.from('anon_users_public').select('id, username').in('id', userIds);
       const usernameMap = new Map(usersData?.map(u => [u.id, u.username]) || []);
 
-      setMessages(
-        messagesData?.map(m => ({
-          ...m,
-          username: usernameMap.get(m.user_id) || 'Unknown',
-        })) || []
-      );
+      const messagesWithReplies = (messagesData || []).map((m: any) => {
+        let replyTo = null;
+        if (m.reply_to_id) {
+          const replyMsg = messagesData?.find((msg: any) => msg.id === m.reply_to_id);
+          if (replyMsg) {
+            replyTo = { content: replyMsg.content, username: usernameMap.get(replyMsg.user_id) || 'Unknown' };
+          }
+        }
+        return { ...m, username: usernameMap.get(m.user_id) || 'Unknown', replyTo };
+      });
+
+      setMessages(messagesWithReplies);
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -127,17 +113,15 @@ const ChannelChatPage = () => {
 
   const handleSend = async () => {
     if (!newMessage.trim() || !user || !channelId || sending) return;
-
     setSending(true);
     try {
-      const { error } = await supabase.from('channel_messages').insert({
-        channel_id: channelId,
-        user_id: user.id,
-        content: newMessage.trim(),
-      });
-
+      const insertData: any = { channel_id: channelId, user_id: user.id, content: newMessage.trim() };
+      if (replyingTo) insertData.reply_to_id = replyingTo.id;
+      
+      const { error } = await supabase.from('channel_messages').insert(insertData);
       if (error) throw error;
       setNewMessage('');
+      setReplyingTo(null);
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -145,12 +129,18 @@ const ChannelChatPage = () => {
     }
   };
 
+  const handleEdit = async (messageId: string, newContent: string) => {
+    const { error } = await supabase.from('channel_messages').update({ content: newContent }).eq('id', messageId);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+  };
+
+  const handleDelete = async (messageId: string) => {
+    const { error } = await supabase.from('channel_messages').delete().eq('id', messageId);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+  };
+
   if (!user || loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
+    return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">Loading...</p></div>;
   }
 
   if (!channel) return null;
@@ -158,12 +148,7 @@ const ChannelChatPage = () => {
   return (
     <div className="h-screen bg-background flex flex-col">
       <header className="border-b border-border bg-card/50 backdrop-blur-sm px-4 py-3 flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/channels')}
-          className="text-muted-foreground hover:text-foreground"
-        >
+        <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -186,75 +171,45 @@ const ChannelChatPage = () => {
               <p className="text-muted-foreground">No messages yet. Be the first!</p>
             </div>
           ) : (
-            messages.map((message) => {
-              const isOwn = message.user_id === user.id;
-              return (
-                <div
-                  key={message.id}
-                  className={cn(
-                    'flex flex-col gap-1 max-w-[75%] message-appear',
-                    isOwn ? 'ml-auto items-end' : 'items-start'
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      'font-mono text-xs',
-                      isOwn ? 'text-primary' : 'text-accent'
-                    )}>
-                      {isOwn ? 'You' : message.username}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {format(new Date(message.created_at), 'HH:mm')}
-                    </span>
-                  </div>
-                  <div
-                    className={cn(
-                      'px-4 py-2.5 rounded-2xl',
-                      isOwn
-                        ? 'bg-message-own border border-primary/20 rounded-br-md'
-                        : 'bg-message-other border border-border rounded-bl-md'
-                    )}
-                  >
-                    <p className="text-sm text-foreground leading-relaxed break-words">
-                      {message.content}
-                    </p>
-                  </div>
-                </div>
-              );
-            })
+            messages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                id={message.id}
+                content={message.content}
+                username={message.username}
+                createdAt={message.created_at}
+                isOwn={message.user_id === user.id}
+                replyTo={message.replyTo}
+                onReply={() => setReplyingTo(message)}
+                onEdit={(newContent) => handleEdit(message.id, newContent)}
+                onDelete={() => handleDelete(message.id)}
+              />
+            ))
           )}
           <div ref={messagesEndRef} />
         </div>
       </main>
 
-      <div className="border-t border-border bg-card/50 backdrop-blur-sm p-4">
-        <div className="max-w-3xl mx-auto flex items-center gap-3">
-          <GameSelector 
-            playerName={user.username} 
-            onSendMessage={(msg) => {
-              supabase.from('channel_messages').insert({
-                channel_id: channelId,
-                user_id: user.id,
-                content: msg,
-              });
-            }}
-          />
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-            placeholder={`Message #${channel.name}...`}
-            className="flex-1 px-4 py-3 bg-input border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-mono text-sm"
-            maxLength={500}
-          />
-          <Button
-            onClick={handleSend}
-            disabled={!newMessage.trim() || sending}
-            className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 chat-glow"
-          >
-            <Send className="w-5 h-5" />
-          </Button>
+      <div className="border-t border-border bg-card/50 backdrop-blur-sm">
+        {replyingTo && (
+          <ReplyPreview username={replyingTo.username} content={replyingTo.content} onCancel={() => setReplyingTo(null)} />
+        )}
+        <div className="p-4">
+          <div className="max-w-3xl mx-auto flex items-center gap-3">
+            <GameSelector playerName={user.username} onSendMessage={(msg) => { supabase.from('channel_messages').insert({ channel_id: channelId, user_id: user.id, content: msg }); }} />
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+              placeholder={`Message #${channel.name}...`}
+              className="flex-1 px-4 py-3 bg-input border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-mono text-sm"
+              maxLength={500}
+            />
+            <Button onClick={handleSend} disabled={!newMessage.trim() || sending} className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 chat-glow">
+              <Send className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
