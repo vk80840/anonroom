@@ -8,6 +8,8 @@ import AuthPage from "./pages/AuthPage";
 import GroupsPage from "./pages/GroupsPage";
 import JoinGroupPage from "./pages/JoinGroupPage";
 import ChatPage from "./pages/ChatPage";
+import DirectMessagesPage from "./pages/DirectMessagesPage";
+import DMChatPage from "./pages/DMChatPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +26,8 @@ const App = () => (
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/join" element={<JoinGroupPage />} />
           <Route path="/chat/:groupId" element={<ChatPage />} />
+          <Route path="/dm" element={<DirectMessagesPage />} />
+          <Route path="/dm/:recipientId" element={<DMChatPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

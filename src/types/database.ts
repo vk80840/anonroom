@@ -32,3 +32,12 @@ export interface Message {
 export interface GroupWithMemberCount extends Group {
   member_count: number;
 }
+
+export interface DirectMessage {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  created_at: string;
+  read_at: string | null;
+}

@@ -38,6 +38,33 @@ export type Database = {
         }
         Relationships: []
       }
+      direct_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          read_at: string | null
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: []
+      }
       group_members: {
         Row: {
           group_id: string
@@ -202,6 +229,10 @@ export type Database = {
           last_seen_at: string
           username: string
         }[]
+      }
+      is_dm_participant: {
+        Args: { check_user: string; receiver: string; sender: string }
+        Returns: boolean
       }
       is_group_member: {
         Args: { group_uuid: string; user_uuid: string }
