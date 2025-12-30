@@ -3,9 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Gamepad2 } from 'lucide-react';
 import TicTacToe from './TicTacToe';
 import RockPaperScissors from './RockPaperScissors';
-import PingPong from './PingPong';
-import GuessTheWord from './GuessTheWord';
-import SnakeGame from './SnakeGame';
 import MemoryGame from './MemoryGame';
 
 interface GameSelectorProps {
@@ -13,14 +10,11 @@ interface GameSelectorProps {
   onSendMessage?: (message: string) => void;
 }
 
-type GameType = 'none' | 'tictactoe' | 'rps' | 'pingpong' | 'guessword' | 'snake' | 'memory';
+type GameType = 'none' | 'tictactoe' | 'rps' | 'memory';
 
 const games = [
   { id: 'tictactoe' as GameType, name: 'Tic Tac Toe', emoji: '⭕' },
   { id: 'rps' as GameType, name: 'Rock Paper Scissors', emoji: '✂️' },
-  { id: 'pingpong' as GameType, name: 'Ping Pong', emoji: '🏓' },
-  { id: 'guessword' as GameType, name: 'Guess the Word', emoji: '🔤' },
-  { id: 'snake' as GameType, name: 'Snake', emoji: '🐍' },
   { id: 'memory' as GameType, name: 'Memory Match', emoji: '🧠' },
 ];
 
@@ -47,15 +41,6 @@ const GameSelector = ({ playerName, onSendMessage }: GameSelectorProps) => {
         )}
         {activeGame === 'rps' && (
           <RockPaperScissors onClose={closeGame} player1={playerName} />
-        )}
-        {activeGame === 'pingpong' && (
-          <PingPong onClose={closeGame} player1={playerName} />
-        )}
-        {activeGame === 'guessword' && (
-          <GuessTheWord onClose={closeGame} player1={playerName} onSendHint={onSendMessage} />
-        )}
-        {activeGame === 'snake' && (
-          <SnakeGame onClose={closeGame} player1={playerName} />
         )}
         {activeGame === 'memory' && (
           <MemoryGame onClose={closeGame} player1={playerName} />
