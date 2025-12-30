@@ -53,82 +53,39 @@ const AuthPage = () => {
     setLoading(true);
 
     try {
-      if (isLogin) {
-        // Login - find user and verify password
-        const { data: users, error } = await supabase
-          .from('anon_users')
-          .select('*')
-          .eq('username', username.toLowerCase())
-          .limit(1);
+      // Call the secure auth edge function
+      const { data, error } = await supabase.functions.invoke('auth', {
+        body: {
+          action: isLogin ? 'login' : 'signup',
+          username: username.trim(),
+          password: password,
+        },
+      });
 
-        if (error) throw error;
-        
-        if (!users || users.length === 0) {
-          toast({
-            title: "Error",
-            description: "Username not found",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
+      if (error) {
+        throw new Error(error.message || 'Authentication failed');
+      }
 
-        const user = users[0];
-        
-        // Simple password check (in production, use proper hashing)
-        if (user.password_hash !== password) {
-          toast({
-            title: "Error",
-            description: "Incorrect password",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-
-        setUser(user);
+      if (data.error) {
         toast({
-          title: "Welcome back!",
-          description: `Logged in as ${user.username}`,
+          title: "Error",
+          description: data.error,
+          variant: "destructive",
         });
-        navigate('/groups');
-      } else {
-        // Signup - create new user
-        const { data: existing } = await supabase
-          .from('anon_users')
-          .select('id')
-          .eq('username', username.toLowerCase())
-          .limit(1);
+        setLoading(false);
+        return;
+      }
 
-        if (existing && existing.length > 0) {
-          toast({
-            title: "Error",
-            description: "Username already taken",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-
-        const { data: newUser, error } = await supabase
-          .from('anon_users')
-          .insert({
-            username: username.toLowerCase(),
-            password_hash: password, // In production, hash this!
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        setUser(newUser);
+      if (data.user) {
+        setUser(data.user);
         toast({
-          title: "Account created!",
-          description: `Welcome, ${newUser.username}`,
+          title: isLogin ? "Welcome back!" : "Account created!",
+          description: `${isLogin ? 'Logged in as' : 'Welcome,'} ${data.user.username}`,
         });
         navigate('/groups');
       }
     } catch (error: any) {
+      console.error('Auth error:', error);
       toast({
         title: "Error",
         description: error.message || "Something went wrong",
@@ -223,7 +180,7 @@ const AuthPage = () => {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          Your data is stored securely. No tracking, no analytics.
+          Your password is securely hashed. No tracking, no analytics.
         </p>
       </div>
     </div>

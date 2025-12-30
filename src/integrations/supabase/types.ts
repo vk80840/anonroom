@@ -72,6 +72,13 @@ export type Database = {
             referencedRelation: "anon_users"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "group_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "anon_users_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       groups: {
@@ -105,6 +112,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "anon_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "anon_users_public"
             referencedColumns: ["id"]
           },
         ]
@@ -146,14 +160,63 @@ export type Database = {
             referencedRelation: "anon_users"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "anon_users_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      anon_users_public: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          last_seen_at: string | null
+          username: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          last_seen_at?: string | null
+          username?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          last_seen_at?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      create_user_with_password: {
+        Args: { hashed_password: string; user_username: string }
+        Returns: {
+          created_at: string
+          id: string
+          last_seen_at: string
+          username: string
+        }[]
+      }
+      is_group_member: {
+        Args: { group_uuid: string; user_uuid: string }
+        Returns: boolean
+      }
+      verify_password: {
+        Args: { provided_password: string; user_username: string }
+        Returns: {
+          created_at: string
+          id: string
+          last_seen_at: string
+          password_valid: boolean
+          username: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

@@ -50,7 +50,7 @@ const ChatPage = () => {
           const newMsg = payload.new as Message;
           // Fetch username for the new message
           const { data: userData } = await supabase
-            .from('anon_users')
+            .from('anon_users_public')
             .select('username')
             .eq('id', newMsg.user_id)
             .single();
@@ -110,7 +110,7 @@ const ChatPage = () => {
       if (membersData) {
         const userIds = membersData.map(m => m.user_id);
         const { data: usersData } = await supabase
-          .from('anon_users')
+          .from('anon_users_public')
           .select('id, username')
           .in('id', userIds);
         
@@ -129,7 +129,7 @@ const ChatPage = () => {
       // Get usernames for all messages
       const userIds = [...new Set(messagesData?.map(m => m.user_id) || [])];
       const { data: usersData } = await supabase
-        .from('anon_users')
+        .from('anon_users_public')
         .select('id, username')
         .in('id', userIds);
 
