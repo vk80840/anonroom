@@ -1,11 +1,41 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Simple hash function using SHA-256 with salt
+async function hashPassword(password: string, salt?: string): Promise<string> {
+  const actualSalt = salt || crypto.randomUUID();
+  const data = new TextEncoder().encode(password + actualSalt);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = new Uint8Array(hashBuffer);
+  const hashHex = Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
+  return `sha256:${actualSalt}:${hashHex}`;
+}
+
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  // Handle legacy bcrypt hashes - compare plain text temporarily
+  if (storedHash.startsWith('$2')) {
+    // For bcrypt hashes, we can't verify them without bcrypt
+    // This is a migration path - user needs to reset password
+    return false;
+  }
+  
+  // Handle SHA-256 hashes
+  if (storedHash.startsWith('sha256:')) {
+    const parts = storedHash.split(':');
+    if (parts.length !== 3) return false;
+    const salt = parts[1];
+    const newHash = await hashPassword(password, salt);
+    return newHash === storedHash;
+  }
+  
+  // Handle plain text passwords (legacy)
+  return storedHash === password;
+}
 
 // Simple token generator
 const generateToken = () => {
@@ -84,7 +114,7 @@ serve(async (req) => {
         );
       }
 
-      const valid = await bcrypt.compare(answer.toLowerCase().trim(), users[0].security_answer_hash);
+      const valid = await verifyPassword(answer.toLowerCase().trim(), users[0].security_answer_hash);
       if (!valid) {
         return new Response(
           JSON.stringify({ error: 'Incorrect answer' }),
@@ -120,8 +150,7 @@ serve(async (req) => {
         );
       }
 
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(new_password, salt);
+      const hashedPassword = await hashPassword(new_password);
 
       const { error } = await supabase
         .from('anon_users')
@@ -148,8 +177,7 @@ serve(async (req) => {
         );
       }
 
-      const salt = await bcrypt.genSalt(10);
-      const answerHash = await bcrypt.hash(security_answer.toLowerCase().trim(), salt);
+      const answerHash = await hashPassword(security_answer.toLowerCase().trim());
 
       const { error } = await supabase
         .from('anon_users')
@@ -191,13 +219,7 @@ serve(async (req) => {
       }
 
       const user = users[0];
-      let passwordValid = false;
-
-      if (user.password_hash.startsWith('$2')) {
-        passwordValid = await bcrypt.compare(password, user.password_hash);
-      } else {
-        passwordValid = user.password_hash === password;
-      }
+      const passwordValid = await verifyPassword(password, user.password_hash);
 
       if (!passwordValid) {
         return new Response(
@@ -206,8 +228,7 @@ serve(async (req) => {
         );
       }
 
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(new_password, salt);
+      const hashedPassword = await hashPassword(new_password);
 
       const { error } = await supabase
         .from('anon_users')
@@ -264,8 +285,7 @@ serve(async (req) => {
         );
       }
 
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
+      const hashedPassword = await hashPassword(password);
 
       const { data: newUser, error } = await supabase
         .from('anon_users')
@@ -300,17 +320,12 @@ serve(async (req) => {
       }
 
       const user = users[0];
-      let passwordValid = false;
+      let passwordValid = await verifyPassword(password, user.password_hash);
       
-      if (user.password_hash.startsWith('$2')) {
-        passwordValid = await bcrypt.compare(password, user.password_hash);
-      } else {
-        passwordValid = user.password_hash === password;
-        if (passwordValid) {
-          const salt = await bcrypt.genSalt(10);
-          const hashedPassword = await bcrypt.hash(password, salt);
-          await supabase.from('anon_users').update({ password_hash: hashedPassword }).eq('id', user.id);
-        }
+      // If password is valid and it was plain text, upgrade to SHA-256
+      if (passwordValid && !user.password_hash.startsWith('sha256:') && !user.password_hash.startsWith('$2')) {
+        const hashedPassword = await hashPassword(password);
+        await supabase.from('anon_users').update({ password_hash: hashedPassword }).eq('id', user.id);
       }
 
       if (!passwordValid) {
