@@ -1,0 +1,9 @@
+{
+  "appId": "app.lovable.0ce79c39cb9f4a7db774547c19e66b32",
+  "appName": "AnonChat",
+  "webDir": "dist",
+  "server": {
+    "url": "https://0ce79c39-cb9f-4a7d-b774-547c19e66b32.lovableproject.com?forceHideBadge=true",
+    "cleartext": true
+  }
+}

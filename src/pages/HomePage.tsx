@@ -1,179 +1,202 @@
-import { Shield, Users, MessageCircle, Lock, Zap, Globe } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { MessageCircle, Users, Shield, Hash, Zap, Lock, UserCircle, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/authStore';
+import { supabase } from '@/integrations/supabase/client';
+import { GlobalSearch } from '@/components/GlobalSearch';
+import { Channel } from '@/types/database';
 
 const HomePage = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const [popularChannels, setPopularChannels] = useState<Channel[]>([]);
+
+  useEffect(() => {
+    fetchPopularChannels();
+  }, []);
+
+  const fetchPopularChannels = async () => {
+    const { data } = await supabase
+      .from('channels')
+      .select('*')
+      .order('member_count', { ascending: false })
+      .limit(3);
+    setPopularChannels(data || []);
+  };
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center chat-glow">
-              <Shield className="w-5 h-5 text-primary" />
-            </div>
-            <h1 className="font-mono font-semibold text-xl text-foreground">
-              anon<span className="text-primary">chat</span>
-            </h1>
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield className="w-6 h-6 text-primary" />
+            <span className="font-bold text-foreground">AnonChat</span>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <GlobalSearch />
             {user ? (
-              <>
-                <span className="text-sm text-muted-foreground">
-                  Logged in as <span className="font-mono text-primary">{user.username}</span>
-                </span>
-                <Button 
-                  onClick={() => navigate('/groups')}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                >
-                  My Groups
-                </Button>
-              </>
+              <Button size="sm" onClick={() => navigate('/groups')}>Dashboard</Button>
             ) : (
               <>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => navigate('/auth?mode=login')}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  Login
-                </Button>
-                <Button 
-                  onClick={() => navigate('/auth?mode=signup')}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                >
-                  Get Started
-                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/auth?mode=login')}>Login</Button>
+                <Button size="sm" onClick={() => navigate('/auth?mode=signup')}>Sign Up</Button>
               </>
             )}
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="container mx-auto px-6 py-24 text-center">
-        <div className="max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8">
-            <div className="w-2 h-2 rounded-full bg-online pulse-online" />
-            <span className="text-sm font-mono text-primary">100% Anonymous</span>
+      {/* Hero */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-accent/10" />
+        <div className="container mx-auto px-4 py-16 sm:py-20 relative">
+          <div className="max-w-3xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
+              <Shield className="w-4 h-4 text-primary" />
+              <span className="text-sm text-primary font-medium">100% Anonymous</span>
+            </div>
+            
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6 leading-tight">
+              Chat Without
+              <span className="text-primary"> Identity</span>
+            </h1>
+            
+            <p className="text-lg sm:text-xl text-muted-foreground mb-8 leading-relaxed">
+              No email. No phone. Just a username and password.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              {user ? (
+                <Button size="lg" onClick={() => navigate('/groups')} className="chat-glow">
+                  Go to Dashboard
+                </Button>
+              ) : (
+                <>
+                  <Button size="lg" onClick={() => navigate('/auth?mode=signup')} className="chat-glow">
+                    Get Started Free
+                  </Button>
+                  <Button size="lg" variant="outline" onClick={() => navigate('/auth?mode=login')}>
+                    Sign In
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Links for logged in users */}
+      {user && (
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <QuickLink icon={Users} title="My Groups" onClick={() => navigate('/groups')} />
+            <QuickLink icon={UserCircle} title="Direct Messages" onClick={() => navigate('/dm')} />
+            <QuickLink icon={Hash} title="Channels" onClick={() => navigate('/channels')} />
+            <QuickLink icon={Zap} title="Settings" onClick={() => navigate('/settings')} />
+          </div>
+        </div>
+      )}
+
+      {/* Popular Channels */}
+      {popularChannels.length > 0 && (
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              Popular Channels
+            </h2>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/channels')}>
+              View All
+            </Button>
           </div>
           
-          <h2 className="text-5xl md:text-6xl font-bold text-foreground mb-6 leading-tight">
-            Chat Without
-            <span className="text-primary"> Identity</span>
-          </h2>
-          
-          <p className="text-xl text-muted-foreground mb-12 leading-relaxed">
-            No email. No phone. No trace. Create groups, invite friends, 
-            and communicate with complete anonymity.
-          </p>
-          
-          <div className="flex items-center justify-center gap-4">
-            <Button 
-              size="lg"
-              onClick={() => navigate('/auth?mode=signup')}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 text-lg chat-glow"
-            >
-              Create Account
-            </Button>
-            <Button 
-              size="lg"
-              variant="outline"
-              onClick={() => navigate('/join')}
-              className="border-border hover:bg-secondary px-8 py-6 text-lg"
-            >
-              Join with Code
+          <div className="grid sm:grid-cols-3 gap-3">
+            {popularChannels.map(channel => (
+              <div
+                key={channel.id}
+                onClick={() => navigate('/channels')}
+                className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:border-primary/30 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                    <Hash className="w-5 h-5 text-green-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-foreground truncate">#{channel.name}</p>
+                    <p className="text-xs text-muted-foreground">{channel.member_count} members</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Features */}
+      <div className="container mx-auto px-4 py-12">
+        <h2 className="text-2xl sm:text-3xl font-bold text-center text-foreground mb-8">
+          Everything for private communication
+        </h2>
+        
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <FeatureCard icon={Users} title="Private Groups" description="Invite-only groups with custom codes" />
+          <FeatureCard icon={Hash} title="Public Channels" description="Discover and join communities" />
+          <FeatureCard icon={MessageCircle} title="Direct Messages" description="Message anyone by username" />
+          <FeatureCard icon={Lock} title="Secure Passwords" description="Bcrypt hashed with recovery" />
+          <FeatureCard icon={Zap} title="Real-time Chat" description="Instant message delivery" />
+          <FeatureCard icon={Shield} title="Your Control" description="Themes, profile, privacy" />
+        </div>
+      </div>
+
+      {/* CTA */}
+      {!user && (
+        <div className="container mx-auto px-4 py-12">
+          <div className="bg-card border border-border rounded-2xl p-8 sm:p-12 text-center">
+            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
+              Ready to chat anonymously?
+            </h2>
+            <p className="text-muted-foreground mb-6 max-w-xl mx-auto">
+              No tracking, no analytics, no data selling.
+            </p>
+            <Button size="lg" onClick={() => navigate('/auth?mode=signup')}>
+              Create Free Account
             </Button>
           </div>
         </div>
-      </section>
-
-      {/* Features Grid */}
-      <section className="container mx-auto px-6 py-16">
-        <div className="grid md:grid-cols-3 gap-8">
-          <FeatureCard
-            icon={<Lock className="w-6 h-6" />}
-            title="Username Only"
-            description="No email, no phone number. Just pick a username and password. That's it."
-          />
-          <FeatureCard
-            icon={<Users className="w-6 h-6" />}
-            title="Private Groups"
-            description="Create invite-only groups. Share codes with friends. Control who joins."
-          />
-          <FeatureCard
-            icon={<MessageCircle className="w-6 h-6" />}
-            title="Real-time Chat"
-            description="Instant messaging with live updates. See who's typing, who's online."
-          />
-          <FeatureCard
-            icon={<Zap className="w-6 h-6" />}
-            title="Lightning Fast"
-            description="No bloat, no tracking scripts. Pure speed for pure communication."
-          />
-          <FeatureCard
-            icon={<Globe className="w-6 h-6" />}
-            title="Access Anywhere"
-            description="Works on any device. No app downloads required. Just open and chat."
-          />
-          <FeatureCard
-            icon={<Shield className="w-6 h-6" />}
-            title="Zero Knowledge"
-            description="We don't know who you are. We don't want to know. Stay anonymous."
-          />
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="container mx-auto px-6 py-24">
-        <div className="bg-card border border-border rounded-2xl p-12 text-center">
-          <h3 className="text-3xl font-bold text-foreground mb-4">
-            Ready to go ghost?
-          </h3>
-          <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
-            Join thousands of users who value their privacy. 
-            Create your anonymous identity in seconds.
-          </p>
-          <Button 
-            size="lg"
-            onClick={() => navigate('/auth?mode=signup')}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 chat-glow"
-          >
-            Start Chatting Anonymously
-          </Button>
-        </div>
-      </section>
+      )}
 
       {/* Footer */}
-      <footer className="border-t border-border py-8">
-        <div className="container mx-auto px-6 text-center text-sm text-muted-foreground">
-          <p>No logs. No traces. No identity.</p>
+      <footer className="border-t border-border py-6">
+        <div className="container mx-auto px-4 text-center text-muted-foreground text-sm">
+          <p>Anonymous Chat • No tracking • No data collection</p>
         </div>
       </footer>
     </div>
   );
 };
 
-const FeatureCard = ({ 
-  icon, 
-  title, 
-  description 
-}: { 
-  icon: React.ReactNode; 
-  title: string; 
-  description: string; 
-}) => (
-  <div className="p-6 rounded-xl bg-card border border-border hover:border-primary/30 transition-colors group">
-    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 text-primary group-hover:chat-glow transition-shadow">
-      {icon}
+const QuickLink = ({ icon: Icon, title, onClick }: { icon: any; title: string; onClick: () => void }) => (
+  <button
+    onClick={onClick}
+    className="flex flex-col items-center gap-2 p-4 bg-card border border-border rounded-xl hover:border-primary/30 transition-colors"
+  >
+    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+      <Icon className="w-5 h-5 text-primary" />
     </div>
-    <h4 className="text-lg font-semibold text-foreground mb-2">{title}</h4>
-    <p className="text-muted-foreground text-sm">{description}</p>
+    <span className="text-sm font-medium text-foreground">{title}</span>
+  </button>
+);
+
+const FeatureCard = ({ icon: Icon, title, description }: { icon: any; title: string; description: string }) => (
+  <div className="bg-card border border-border rounded-xl p-5 hover:border-primary/30 transition-colors">
+    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
+      <Icon className="w-5 h-5 text-primary" />
+    </div>
+    <h3 className="font-semibold text-foreground mb-1">{title}</h3>
+    <p className="text-sm text-muted-foreground">{description}</p>
   </div>
 );
 
