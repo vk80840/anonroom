@@ -16,25 +16,128 @@ export type Database = {
     Tables: {
       anon_users: {
         Row: {
+          bio: string | null
+          birthday: string | null
           created_at: string
           id: string
           last_seen_at: string | null
+          links: Json | null
           password_hash: string
+          security_answer_hash: string | null
+          security_question: string | null
           username: string
         }
         Insert: {
+          bio?: string | null
+          birthday?: string | null
           created_at?: string
           id?: string
           last_seen_at?: string | null
+          links?: Json | null
           password_hash: string
+          security_answer_hash?: string | null
+          security_question?: string | null
           username: string
         }
         Update: {
+          bio?: string | null
+          birthday?: string | null
           created_at?: string
           id?: string
           last_seen_at?: string | null
+          links?: Json | null
           password_hash?: string
+          security_answer_hash?: string | null
+          security_question?: string | null
           username?: string
+        }
+        Relationships: []
+      }
+      channel_members: {
+        Row: {
+          channel_id: string
+          id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          id?: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_members_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channel_messages: {
+        Row: {
+          channel_id: string
+          content: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          content: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_messages_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channels: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          member_count: number | null
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          member_count?: number | null
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          member_count?: number | null
+          name?: string
         }
         Relationships: []
       }
@@ -112,6 +215,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          custom_code: string | null
           description: string | null
           id: string
           invite_code: string
@@ -120,6 +224,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
+          custom_code?: string | null
           description?: string | null
           id?: string
           invite_code?: string
@@ -128,6 +233,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          custom_code?: string | null
           description?: string | null
           id?: string
           invite_code?: string
