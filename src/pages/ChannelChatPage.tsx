@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Channel, ChannelMessage } from '@/types/database';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import GameSelector from '@/components/games/GameSelector';
 
 const ChannelChatPage = () => {
   const { channelId } = useParams();
@@ -228,6 +229,16 @@ const ChannelChatPage = () => {
 
       <div className="border-t border-border bg-card/50 backdrop-blur-sm p-4">
         <div className="max-w-3xl mx-auto flex items-center gap-3">
+          <GameSelector 
+            playerName={user.username} 
+            onSendMessage={(msg) => {
+              supabase.from('channel_messages').insert({
+                channel_id: channelId,
+                user_id: user.id,
+                content: msg,
+              });
+            }}
+          />
           <input
             type="text"
             value={newMessage}

@@ -7,6 +7,7 @@ export interface AnonUser {
   birthday?: string | null;
   links?: string[];
   security_question?: string | null;
+  avatar_url?: string | null;
 }
 
 export interface Group {

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Moon, Sun, Check, User, Lock, Shield, Palette } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, Check, User, Lock, Shield, Palette, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,8 +30,9 @@ const SettingsPage = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!user) {
     navigate('/auth?mode=login');
@@ -58,6 +59,51 @@ const SettingsPage = () => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({ title: "Error", description: "Please select an image file", variant: "destructive" });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "Error", description: "Image must be less than 2MB", variant: "destructive" });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase
+        .from('anon_users')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      setUser({ ...user, avatar_url: publicUrl });
+      toast({ title: "Avatar updated!", description: "Your new profile picture is set" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -145,7 +191,7 @@ const SettingsPage = () => {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate('/groups')}
+          onClick={() => navigate('/')}
           className="text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -217,6 +263,39 @@ const SettingsPage = () => {
             <div className="bg-card border border-border rounded-xl p-6">
               <h2 className="font-semibold text-foreground mb-4">Your Profile</h2>
               <div className="space-y-4">
+                {/* Avatar Upload */}
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border-2 border-border">
+                      {user.avatar_url ? (
+                        <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-8 h-8 text-primary" />
+                      )}
+                    </div>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors"
+                    >
+                      <Camera className="w-4 h-4" />
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Profile Picture</p>
+                    <p className="text-xs text-muted-foreground">
+                      {uploading ? 'Uploading...' : 'Click the camera to upload'}
+                    </p>
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-sm text-muted-foreground mb-2 block">Username</label>
                   <Input value={user.username} disabled className="bg-muted font-mono" />
