@@ -378,6 +378,39 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          games_enabled: boolean
+          id: string
+          mentions_enabled: boolean
+          messages_enabled: boolean
+          sound_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          games_enabled?: boolean
+          id?: string
+          mentions_enabled?: boolean
+          messages_enabled?: boolean
+          sound_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          games_enabled?: boolean
+          id?: string
+          mentions_enabled?: boolean
+          messages_enabled?: boolean
+          sound_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       anon_users_public: {
