@@ -91,6 +91,8 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          media_type: string | null
+          media_url: string | null
           reply_to_id: string | null
           user_id: string
         }
@@ -99,6 +101,8 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           reply_to_id?: string | null
           user_id: string
         }
@@ -107,6 +111,8 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           reply_to_id?: string | null
           user_id?: string
         }
@@ -159,6 +165,8 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          media_type: string | null
+          media_url: string | null
           read_at: string | null
           receiver_id: string
           reply_to_id: string | null
@@ -168,6 +176,8 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           read_at?: string | null
           receiver_id: string
           reply_to_id?: string | null
@@ -177,6 +187,8 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           read_at?: string | null
           receiver_id?: string
           reply_to_id?: string | null
@@ -328,6 +340,8 @@ export type Database = {
           created_at: string
           group_id: string
           id: string
+          media_type: string | null
+          media_url: string | null
           reply_to_id: string | null
           user_id: string
         }
@@ -336,6 +350,8 @@ export type Database = {
           created_at?: string
           group_id: string
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           reply_to_id?: string | null
           user_id: string
         }
@@ -344,6 +360,8 @@ export type Database = {
           created_at?: string
           group_id?: string
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           reply_to_id?: string | null
           user_id?: string
         }
