@@ -231,6 +231,8 @@ const ChannelChatPage = () => {
             <GameMessage
               gameType={activeGame}
               playerName={user.username}
+              playerId={user.id}
+              currentUserId={user.id}
               members={members}
               onClose={() => setActiveGame('none')}
             />
