@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Users, Shield, Hash, Plus, Settings, Search, User, Camera } from 'lucide-react';
+import { MessageCircle, Users, Shield, Hash, Plus, Settings, Search, User, Camera, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -10,6 +10,7 @@ import { AnonUser, DirectMessage } from '@/types/database';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { useSoundEffects } from '@/hooks/useSoundEffects';
 
 interface Conversation {
   id: string;
@@ -23,7 +24,8 @@ interface Conversation {
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
+  const { playClick } = useSoundEffects();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -337,6 +339,18 @@ const HomePage = () => {
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
             <Settings className="w-5 h-5" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => { 
+              playClick(); 
+              logout(); 
+              navigate('/auth?mode=login'); 
+            }}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <LogOut className="w-5 h-5" />
           </Button>
         </div>
       </header>

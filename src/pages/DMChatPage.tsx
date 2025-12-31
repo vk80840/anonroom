@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Send } from 'lucide-react';
+import { ArrowLeft, User, Send, Gamepad2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/use-toast';
 import { AnonUser, DirectMessage } from '@/types/database';
-import GameSelector, { GameDisplay } from '@/components/games/GameSelector';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ReplyPreview from '@/components/chat/ReplyPreview';
+import GameMessage from '@/components/chat/GameMessage';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import InAppKeyboard from '@/components/keyboard/InAppKeyboard';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 
 interface DMWithReply extends DirectMessage {
@@ -17,12 +18,20 @@ interface DMWithReply extends DirectMessage {
   replyTo?: { content: string; username: string } | null;
 }
 
+type GameType = 'none' | 'tictactoe' | 'rps' | 'memory';
+
+const games = [
+  { id: 'tictactoe' as GameType, name: 'Tic Tac Toe', emoji: '⭕' },
+  { id: 'rps' as GameType, name: 'Rock Paper Scissors', emoji: '✂️' },
+  { id: 'memory' as GameType, name: 'Memory Match', emoji: '🧠' },
+];
+
 const DMChatPage = () => {
   const { recipientId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { toast } = useToast();
-  const { playSend, playNotification } = useSoundEffects();
+  const { playSend, playNotification, playClick } = useSoundEffects();
   
   const [recipient, setRecipient] = useState<AnonUser | null>(null);
   const [messages, setMessages] = useState<DMWithReply[]>([]);
@@ -30,7 +39,9 @@ const DMChatPage = () => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<DMWithReply | null>(null);
-  const [activeGame, setActiveGame] = useState<'none' | 'tictactoe' | 'rps' | 'memory'>('none');
+  const [activeGame, setActiveGame] = useState<GameType>('none');
+  const [showGameMenu, setShowGameMenu] = useState(false);
+  const [showKeyboard, setShowKeyboard] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,7 +85,7 @@ const DMChatPage = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, activeGame]);
 
   const fetchData = async () => {
     if (!recipientId || !user) return;
@@ -130,6 +141,7 @@ const DMChatPage = () => {
       playSend();
       setNewMessage('');
       setReplyingTo(null);
+      setShowKeyboard(false);
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -145,6 +157,14 @@ const DMChatPage = () => {
   const handleDelete = async (messageId: string) => {
     const { error } = await supabase.from('direct_messages').delete().eq('id', messageId);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+  };
+
+  const startGame = (game: GameType) => {
+    playClick();
+    setActiveGame(game);
+    setShowGameMenu(false);
+    const gameName = games.find(g => g.id === game)?.name;
+    supabase.from('direct_messages').insert({ sender_id: user!.id, receiver_id: recipientId, content: `🎮 Started playing ${gameName}!` });
   };
 
   if (!user || loading) {
@@ -195,19 +215,20 @@ const DMChatPage = () => {
               />
             ))
           )}
+          
+          {/* Game displayed as center-aligned message */}
+          {activeGame !== 'none' && (
+            <GameMessage
+              gameType={activeGame}
+              playerName={user.username}
+              player2Name={recipient.username}
+              onClose={() => setActiveGame('none')}
+            />
+          )}
+          
           <div ref={messagesEndRef} />
         </div>
       </main>
-
-      {/* Game Display Area - Above input */}
-      {activeGame !== 'none' && (
-        <GameDisplay
-          playerName={user.username}
-          onSendMessage={(msg) => { supabase.from('direct_messages').insert({ sender_id: user.id, receiver_id: recipientId, content: msg }); }}
-          activeGame={activeGame}
-          setActiveGame={setActiveGame as any}
-        />
-      )}
 
       <div className="border-t border-border bg-card/50 backdrop-blur-sm">
         {replyingTo && (
@@ -217,28 +238,65 @@ const DMChatPage = () => {
             onCancel={() => setReplyingTo(null)} 
           />
         )}
-        <div className="p-4">
-          <div className="max-w-3xl mx-auto flex items-center gap-3">
-            <GameSelector 
-              playerName={user.username} 
-              onSendMessage={(msg) => { supabase.from('direct_messages').insert({ sender_id: user.id, receiver_id: recipientId, content: msg }); }}
-              onGameStart={() => {}}
-              onGameEnd={() => {}}
-            />
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-              placeholder={`Message ${recipient.username}...`}
-              className="flex-1 px-4 py-3 bg-input border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-mono text-sm"
-              maxLength={500}
-            />
-            <Button onClick={handleSend} disabled={!newMessage.trim() || sending} className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 chat-glow">
-              <Send className="w-5 h-5" />
-            </Button>
+        
+        {showKeyboard ? (
+          <InAppKeyboard
+            value={newMessage}
+            onChange={setNewMessage}
+            onSubmit={handleSend}
+            onClose={() => setShowKeyboard(false)}
+          />
+        ) : (
+          <div className="p-4">
+            <div className="max-w-3xl mx-auto flex items-center gap-3">
+              {/* Game selector */}
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => { playClick(); setShowGameMenu(!showGameMenu); }}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Gamepad2 className="w-5 h-5" />
+                </Button>
+                
+                {showGameMenu && (
+                  <div className="absolute bottom-12 left-0 bg-card border border-border rounded-xl p-3 shadow-lg min-w-48 z-50">
+                    <p className="text-xs text-muted-foreground mb-2 font-semibold">Play a Game</p>
+                    <div className="space-y-1">
+                      {games.map(game => (
+                        <button
+                          key={game.id}
+                          onClick={() => startGame(game.id)}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-primary/10 text-foreground text-sm transition-colors"
+                        >
+                          <span>{game.emoji}</span>
+                          <span>{game.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Input area - opens in-app keyboard */}
+              <div 
+                onClick={() => setShowKeyboard(true)}
+                className="flex-1 px-4 py-3 bg-input border border-border rounded-xl text-foreground cursor-text min-h-[48px] flex items-center"
+              >
+                {newMessage ? (
+                  <span className="font-mono text-sm">{newMessage}</span>
+                ) : (
+                  <span className="text-muted-foreground font-mono text-sm">Message {recipient.username}...</span>
+                )}
+              </div>
+              
+              <Button onClick={handleSend} disabled={!newMessage.trim() || sending} className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 chat-glow">
+                <Send className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

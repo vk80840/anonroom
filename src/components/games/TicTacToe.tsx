@@ -8,9 +8,9 @@ interface TicTacToeProps {
   player2?: string;
 }
 
-const TicTacToe = ({ onClose, player1, player2 = 'Bot' }: TicTacToeProps) => {
+const TicTacToe = ({ onClose, player1, player2 = 'Player 2' }: TicTacToeProps) => {
   const [board, setBoard] = useState<(string | null)[]>(Array(9).fill(null));
-  const [isXNext, setIsXNext] = useState(true);
+  const [isPlayer1Turn, setIsPlayer1Turn] = useState(true);
   const [gameOver, setGameOver] = useState(false);
 
   const calculateWinner = (squares: (string | null)[]) => {
@@ -34,9 +34,9 @@ const TicTacToe = ({ onClose, player1, player2 = 'Bot' }: TicTacToeProps) => {
     if (board[i] || winner || gameOver) return;
     
     const newBoard = [...board];
-    newBoard[i] = isXNext ? 'X' : 'O';
+    newBoard[i] = isPlayer1Turn ? 'X' : 'O';
     setBoard(newBoard);
-    setIsXNext(!isXNext);
+    setIsPlayer1Turn(!isPlayer1Turn);
     
     if (calculateWinner(newBoard) || newBoard.every(cell => cell !== null)) {
       setGameOver(true);
@@ -45,21 +45,28 @@ const TicTacToe = ({ onClose, player1, player2 = 'Bot' }: TicTacToeProps) => {
 
   const resetGame = () => {
     setBoard(Array(9).fill(null));
-    setIsXNext(true);
+    setIsPlayer1Turn(true);
     setGameOver(false);
   };
 
+  const currentPlayer = isPlayer1Turn ? player1 : player2;
+  const winnerName = winner === 'X' ? player1 : player2;
+
   const status = winner 
-    ? `🎉 ${winner === 'X' ? player1 : player2} wins!`
+    ? `🎉 ${winnerName} wins!`
     : isDraw 
     ? "It's a draw!"
-    : `${isXNext ? player1 : player2}'s turn (${isXNext ? 'X' : 'O'})`;
+    : `${currentPlayer}'s turn (${isPlayer1Turn ? 'X' : 'O'})`;
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 max-w-xs mx-auto">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-bold text-foreground">Tic Tac Toe</h3>
         <Button variant="ghost" size="sm" onClick={onClose}>✕</Button>
+      </div>
+      
+      <div className="text-center mb-2">
+        <p className="text-xs text-muted-foreground">{player1} (X) vs {player2} (O)</p>
       </div>
       
       <p className="text-sm text-center mb-3 text-muted-foreground">{status}</p>

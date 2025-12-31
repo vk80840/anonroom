@@ -5,14 +5,16 @@ import { cn } from '@/lib/utils';
 interface MemoryGameProps {
   onClose: () => void;
   player1: string;
+  player2?: string;
 }
 
 const EMOJIS = ['🎮', '🎲', '🎯', '🏆', '⭐', '💎', '🔥', '💡'];
 
-const MemoryGame = ({ onClose, player1 }: MemoryGameProps) => {
+const MemoryGame = ({ onClose, player1, player2 = 'Player 2' }: MemoryGameProps) => {
   const [cards, setCards] = useState<{ id: number; emoji: string; flipped: boolean; matched: boolean }[]>([]);
   const [flipped, setFlipped] = useState<number[]>([]);
-  const [moves, setMoves] = useState(0);
+  const [currentPlayer, setCurrentPlayer] = useState<1 | 2>(1);
+  const [scores, setScores] = useState({ player1: 0, player2: 0 });
   const [gameOver, setGameOver] = useState(false);
 
   useEffect(() => {
@@ -25,7 +27,8 @@ const MemoryGame = ({ onClose, player1 }: MemoryGameProps) => {
       .map((emoji, i) => ({ id: i, emoji, flipped: false, matched: false }));
     setCards(shuffled);
     setFlipped([]);
-    setMoves(0);
+    setCurrentPlayer(1);
+    setScores({ player1: 0, player2: 0 });
     setGameOver(false);
   };
 
@@ -38,26 +41,31 @@ const MemoryGame = ({ onClose, player1 }: MemoryGameProps) => {
     setFlipped(newFlipped);
 
     if (newFlipped.length === 2) {
-      setMoves(m => m + 1);
       const [first, second] = newFlipped;
       
       if (cards[first].emoji === cards[second].emoji) {
+        // Match found - current player scores
         setTimeout(() => {
           setCards(prev => prev.map(c => 
             c.id === first || c.id === second ? { ...c, matched: true } : c
           ));
           setFlipped([]);
           
-          // Check win
-          const allMatched = cards.filter(c => c.id !== first && c.id !== second && !c.matched).length === 0;
-          if (allMatched) setGameOver(true);
+          // Update score for current player
+          if (currentPlayer === 1) {
+            setScores(s => ({ ...s, player1: s.player1 + 1 }));
+          } else {
+            setScores(s => ({ ...s, player2: s.player2 + 1 }));
+          }
         }, 300);
       } else {
+        // No match - switch turns
         setTimeout(() => {
           setCards(prev => prev.map(c => 
             c.id === first || c.id === second ? { ...c, flipped: false } : c
           ));
           setFlipped([]);
+          setCurrentPlayer(prev => prev === 1 ? 2 : 1);
         }, 800);
       }
     }
@@ -69,6 +77,10 @@ const MemoryGame = ({ onClose, player1 }: MemoryGameProps) => {
     }
   }, [cards]);
 
+  const currentPlayerName = currentPlayer === 1 ? player1 : player2;
+  const winner = scores.player1 > scores.player2 ? player1 : 
+                 scores.player2 > scores.player1 ? player2 : 'Tie';
+
   return (
     <div className="bg-card border border-border rounded-xl p-4 max-w-xs mx-auto">
       <div className="flex items-center justify-between mb-4">
@@ -76,8 +88,13 @@ const MemoryGame = ({ onClose, player1 }: MemoryGameProps) => {
         <Button variant="ghost" size="sm" onClick={onClose}>✕</Button>
       </div>
       
-      <div className="text-center mb-3">
-        <p className="text-sm text-muted-foreground">Moves: {moves}</p>
+      <div className="text-center mb-3 space-y-1">
+        <p className="text-sm text-muted-foreground">
+          {player1}: {scores.player1} | {player2}: {scores.player2}
+        </p>
+        {!gameOver && (
+          <p className="text-xs text-primary font-medium">{currentPlayerName}'s turn</p>
+        )}
       </div>
 
       <div className="grid grid-cols-4 gap-2 mb-4">
@@ -99,7 +116,7 @@ const MemoryGame = ({ onClose, player1 }: MemoryGameProps) => {
 
       {gameOver && (
         <p className="text-center font-bold mb-2 text-foreground">
-          🎉 You won in {moves} moves!
+          🎉 {winner === 'Tie' ? "It's a tie!" : `${winner} wins!`}
         </p>
       )}
 
