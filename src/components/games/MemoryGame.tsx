@@ -6,11 +6,14 @@ interface MemoryGameProps {
   onClose: () => void;
   player1: string;
   player2?: string;
+  currentUserId: string;
+  player1Id: string;
+  player2Id?: string;
 }
 
 const EMOJIS = ['🎮', '🎲', '🎯', '🏆', '⭐', '💎', '🔥', '💡'];
 
-const MemoryGame = ({ onClose, player1, player2 = 'Player 2' }: MemoryGameProps) => {
+const MemoryGame = ({ onClose, player1, player2 = 'Player 2', currentUserId, player1Id, player2Id }: MemoryGameProps) => {
   const [cards, setCards] = useState<{ id: number; emoji: string; flipped: boolean; matched: boolean }[]>([]);
   const [flipped, setFlipped] = useState<number[]>([]);
   const [currentPlayer, setCurrentPlayer] = useState<1 | 2>(1);
@@ -32,8 +35,16 @@ const MemoryGame = ({ onClose, player1, player2 = 'Player 2' }: MemoryGameProps)
     setGameOver(false);
   };
 
+  // Check if it's the current user's turn
+  const isMyTurn = () => {
+    if (currentPlayer === 1 && currentUserId === player1Id) return true;
+    if (currentPlayer === 2 && currentUserId === player2Id) return true;
+    return false;
+  };
+
   const handleClick = (id: number) => {
     if (flipped.length === 2 || cards[id].flipped || cards[id].matched) return;
+    if (!isMyTurn()) return;
 
     const newCards = cards.map(c => c.id === id ? { ...c, flipped: true } : c);
     setCards(newCards);
@@ -80,6 +91,7 @@ const MemoryGame = ({ onClose, player1, player2 = 'Player 2' }: MemoryGameProps)
   const currentPlayerName = currentPlayer === 1 ? player1 : player2;
   const winner = scores.player1 > scores.player2 ? player1 : 
                  scores.player2 > scores.player1 ? player2 : 'Tie';
+  const waitingForOpponent = !isMyTurn() && !gameOver;
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 max-w-xs mx-auto">
@@ -93,7 +105,12 @@ const MemoryGame = ({ onClose, player1, player2 = 'Player 2' }: MemoryGameProps)
           {player1}: {scores.player1} | {player2}: {scores.player2}
         </p>
         {!gameOver && (
-          <p className="text-xs text-primary font-medium">{currentPlayerName}'s turn</p>
+          <p className={cn(
+            "text-xs font-medium",
+            waitingForOpponent ? "text-muted-foreground" : "text-primary"
+          )}>
+            {waitingForOpponent ? `Waiting for ${currentPlayerName}...` : "Your turn"}
+          </p>
         )}
       </div>
 
@@ -102,11 +119,13 @@ const MemoryGame = ({ onClose, player1, player2 = 'Player 2' }: MemoryGameProps)
           <button
             key={card.id}
             onClick={() => handleClick(card.id)}
+            disabled={!isMyTurn() || card.flipped || card.matched || flipped.length === 2}
             className={cn(
               "w-12 h-12 rounded-lg text-xl flex items-center justify-center transition-all duration-200",
               card.flipped || card.matched
                 ? "bg-primary/20 border-2 border-primary"
-                : "bg-secondary border-2 border-border hover:border-primary/50"
+                : "bg-secondary border-2 border-border hover:border-primary/50",
+              !isMyTurn() && !card.flipped && !card.matched && "opacity-50 cursor-not-allowed"
             )}
           >
             {(card.flipped || card.matched) ? card.emoji : '?'}

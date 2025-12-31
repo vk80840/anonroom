@@ -7,22 +7,22 @@ import MemoryGame from '@/components/games/MemoryGame';
 interface GameMessageProps {
   gameType: 'tictactoe' | 'rps' | 'memory';
   playerName: string;
-  player2Name?: string; // For DMs - the other person
-  members?: { user_id: string; username: string }[]; // For group chats/channels - FCFS
+  playerId: string;
+  currentUserId: string;
+  player2Name?: string;
+  player2Id?: string;
+  members?: { user_id: string; username: string }[];
   onClose: () => void;
 }
 
-const GameMessage = ({ gameType, playerName, player2Name, members, onClose }: GameMessageProps) => {
-  // Determine player 2 based on context
-  // DM: player2Name is the other person
-  // Group/Channel: FCFS - first other member becomes player 2
+const GameMessage = ({ gameType, playerName, playerId, currentUserId, player2Name, player2Id, members, onClose }: GameMessageProps) => {
   const getPlayer2 = () => {
-    if (player2Name) return player2Name;
+    if (player2Name) return { name: player2Name, id: player2Id || '' };
     if (members && members.length > 0) {
-      const otherMembers = members.filter(m => m.username !== playerName);
-      return otherMembers.length > 0 ? otherMembers[0].username : 'Waiting...';
+      const otherMembers = members.filter(m => m.user_id !== playerId);
+      if (otherMembers.length > 0) return { name: otherMembers[0].username, id: otherMembers[0].user_id };
     }
-    return 'Player 2';
+    return { name: 'Waiting...', id: '' };
   };
 
   const player2 = getPlayer2();
@@ -41,13 +41,13 @@ const GameMessage = ({ gameType, playerName, player2Name, members, onClose }: Ga
         
         <div className="bg-background rounded-xl p-3">
           {gameType === 'tictactoe' && (
-            <TicTacToe onClose={onClose} player1={playerName} player2={player2} />
+            <TicTacToe onClose={onClose} player1={playerName} player2={player2.name} currentUserId={currentUserId} player1Id={playerId} player2Id={player2.id} />
           )}
           {gameType === 'rps' && (
-            <RockPaperScissors onClose={onClose} player1={playerName} player2={player2} />
+            <RockPaperScissors onClose={onClose} player1={playerName} player2={player2.name} currentUserId={currentUserId} player1Id={playerId} player2Id={player2.id} />
           )}
           {gameType === 'memory' && (
-            <MemoryGame onClose={onClose} player1={playerName} player2={player2} />
+            <MemoryGame onClose={onClose} player1={playerName} player2={player2.name} currentUserId={currentUserId} player1Id={playerId} player2Id={player2.id} />
           )}
         </div>
       </div>
