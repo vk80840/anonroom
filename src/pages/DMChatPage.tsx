@@ -17,15 +17,19 @@ import { useSoundEffects } from '@/hooks/useSoundEffects';
 import MuteButton from '@/components/chat/MuteButton';
 import { useMutedChats } from '@/hooks/useMutedChats';
 import { useNotifications } from '@/hooks/useNotifications';
+import MediaUpload from '@/components/chat/MediaUpload';
+import MediaMessage from '@/components/chat/MediaMessage';
 
 interface DMWithReply extends DirectMessage {
   reply_to_id?: string | null;
   replyTo?: { content: string; username: string } | null;
+  media_url?: string | null;
+  media_type?: string | null;
 }
 
 interface GameSession {
   id: string;
-  game_type: 'tictactoe' | 'rps' | 'memory';
+  game_type: 'tictactoe' | 'rps' | 'memory' | 'snake' | 'connect4' | 'wordguess';
   player1_id: string;
   player2_id: string | null;
   game_state: any;
@@ -40,6 +44,9 @@ const games = [
   { id: 'tictactoe' as const, name: 'Tic Tac Toe', emoji: '⭕' },
   { id: 'rps' as const, name: 'Rock Paper Scissors', emoji: '✂️' },
   { id: 'memory' as const, name: 'Memory Match', emoji: '🧠' },
+  { id: 'snake' as const, name: 'Snake', emoji: '🐍' },
+  { id: 'connect4' as const, name: 'Connect 4', emoji: '🔴' },
+  { id: 'wordguess' as const, name: 'Word Guess', emoji: '📝' },
 ];
 
 const DMChatPage = () => {
@@ -61,6 +68,7 @@ const DMChatPage = () => {
   const [replyingTo, setReplyingTo] = useState<DMWithReply | null>(null);
   const [showGameMenu, setShowGameMenu] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
+  const [pendingMedia, setPendingMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -210,11 +218,19 @@ const DMChatPage = () => {
   };
 
   const handleSend = async () => {
-    if (!newMessage.trim() || !user || !recipientId || sending) return;
+    if ((!newMessage.trim() && !pendingMedia) || !user || !recipientId || sending) return;
     setSending(true);
     try {
-      const insertData: any = { sender_id: user.id, receiver_id: recipientId, content: newMessage.trim() };
+      const insertData: any = { 
+        sender_id: user.id, 
+        receiver_id: recipientId, 
+        content: newMessage.trim() || (pendingMedia ? `📷 ${pendingMedia.type === 'video' ? 'Video' : 'Photo'}` : '')
+      };
       if (replyingTo) insertData.reply_to_id = replyingTo.id;
+      if (pendingMedia) {
+        insertData.media_url = pendingMedia.url;
+        insertData.media_type = pendingMedia.type;
+      }
       
       const { error } = await supabase.from('direct_messages').insert(insertData);
       if (error) throw error;
@@ -222,11 +238,16 @@ const DMChatPage = () => {
       setNewMessage('');
       setReplyingTo(null);
       setShowKeyboard(false);
+      setPendingMedia(null);
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setSending(false);
     }
+  };
+
+  const handleMediaUpload = (url: string, type: 'image' | 'video') => {
+    setPendingMedia({ url, type });
   };
 
   const handleEdit = async (messageId: string, newContent: string) => {
@@ -239,7 +260,7 @@ const DMChatPage = () => {
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
   };
 
-  const startGame = async (gameType: 'tictactoe' | 'rps' | 'memory') => {
+  const startGame = async (gameType: 'tictactoe' | 'rps' | 'memory' | 'snake' | 'connect4' | 'wordguess') => {
     playClick();
     setShowGameMenu(false);
     
