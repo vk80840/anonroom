@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Moon, Sun, Check, User, Lock, Shield, Palette, Camera, Plus, X, Users } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, Check, User, Lock, Shield, Palette, Camera, Plus, X, Users, Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore, themeColors, ThemeColor } from '@/stores/themeStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +19,7 @@ const SettingsPage = () => {
   const navigate = useNavigate();
   const { user, setUser } = useAuthStore();
   const { theme, color, setTheme, setColor } = useThemeStore();
+  const { useInAppKeyboard, setUseInAppKeyboard } = useSettingsStore();
   const { toast } = useToast();
 
   // Profile state
@@ -298,6 +300,23 @@ const SettingsPage = () => {
                     )}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-primary" />
+                Keyboard
+              </h2>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-foreground">Use In-App Keyboard</span>
+                  <p className="text-xs text-muted-foreground">Enable custom keyboard instead of device keyboard</p>
+                </div>
+                <Switch
+                  checked={useInAppKeyboard}
+                  onCheckedChange={setUseInAppKeyboard}
+                />
               </div>
             </div>
           </TabsContent>
