@@ -1,21 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Users, Shield, Hash, Plus, Settings, Search, User } from 'lucide-react';
+import { MessageCircle, Users, Shield, Hash, Plus, Settings, Search, User, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/integrations/supabase/client';
-import { Channel, Group, AnonUser, DirectMessage } from '@/types/database';
+import { AnonUser, DirectMessage } from '@/types/database';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface Conversation {
   id: string;
   type: 'group' | 'dm' | 'channel';
   name: string;
-  subtitle: string;
   lastMessage?: string;
   lastMessageAt?: string;
   unreadCount?: number;
@@ -24,7 +23,7 @@ interface Conversation {
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,14 +69,24 @@ const HomePage = () => {
           .select('*')
           .in('id', groupIds);
 
-        groups?.forEach(group => {
+        // Fetch last message for each group
+        for (const group of groups || []) {
+          const { data: lastMsg } = await supabase
+            .from('messages')
+            .select('content, created_at')
+            .eq('group_id', group.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
           allConversations.push({
             id: group.id,
             type: 'group',
             name: group.name,
-            subtitle: group.description || 'Private group',
+            lastMessage: lastMsg?.content || 'No messages yet',
+            lastMessageAt: lastMsg?.created_at,
           });
-        });
+        }
       }
 
       // Fetch DM conversations
@@ -114,8 +123,7 @@ const HomePage = () => {
                 id: u.id,
                 type: 'dm',
                 name: u.username,
-                subtitle: entry.msg.content.slice(0, 40),
-                lastMessage: entry.msg.content,
+                lastMessage: entry.msg.content.slice(0, 50),
                 lastMessageAt: entry.msg.created_at,
                 unreadCount: entry.unread,
                 avatarUrl: u.avatar_url || undefined,
@@ -138,17 +146,27 @@ const HomePage = () => {
           .select('*')
           .in('id', channelIds);
 
-        channels?.forEach(channel => {
+        // Fetch last message for each channel
+        for (const channel of channels || []) {
+          const { data: lastMsg } = await supabase
+            .from('channel_messages')
+            .select('content, created_at')
+            .eq('channel_id', channel.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
           allConversations.push({
             id: channel.id,
             type: 'channel',
             name: `#${channel.name}`,
-            subtitle: channel.description || `${channel.member_count || 0} members`,
+            lastMessage: lastMsg?.content || 'No messages yet',
+            lastMessageAt: lastMsg?.created_at,
           });
-        });
+        }
       }
 
-      // Sort by last message time for DMs, otherwise keep order
+      // Sort by last message time
       allConversations.sort((a, b) => {
         if (a.lastMessageAt && b.lastMessageAt) {
           return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
@@ -296,8 +314,8 @@ const HomePage = () => {
 
   const getIconBg = (type: Conversation['type']) => {
     switch (type) {
-      case 'group': return 'bg-blue-500/20 text-blue-500';
-      case 'dm': return 'bg-purple-500/20 text-purple-500';
+      case 'group': return 'bg-primary/20 text-primary';
+      case 'dm': return 'bg-accent/20 text-accent';
       case 'channel': return 'bg-green-500/20 text-green-500';
     }
   };
@@ -347,8 +365,8 @@ const HomePage = () => {
                 onClick={() => navigate(`/dm/${u.id}`)}
                 className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-primary/10 transition-colors"
               >
-                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
-                  <User className="w-4 h-4 text-purple-500" />
+                <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+                  <User className="w-4 h-4 text-accent" />
                 </div>
                 <span className="font-mono text-sm text-foreground">{u.username}</span>
               </button>
@@ -361,12 +379,7 @@ const HomePage = () => {
       <main className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="relative w-16 h-16">
-              <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
-              <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary animate-spin" />
-              <div className="absolute inset-1 rounded-full bg-primary/10 animate-pulse" />
-              <div className="absolute inset-2 rounded-full bg-primary/20 animate-glow-pulse" />
-            </div>
+            <LoadingSpinner size="lg" />
           </div>
         ) : filteredConversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-8 text-center">
@@ -384,7 +397,7 @@ const HomePage = () => {
                   onClick={() => navigateToConversation(conv)}
                   className="w-full flex items-center gap-3 p-4 hover:bg-primary/5 transition-colors text-left"
                 >
-                  <div className={cn('w-12 h-12 rounded-full flex items-center justify-center relative', getIconBg(conv.type))}>
+                  <div className={cn('w-12 h-12 rounded-full flex items-center justify-center relative overflow-hidden', getIconBg(conv.type))}>
                     {conv.avatarUrl ? (
                       <img src={conv.avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
                     ) : (
@@ -405,7 +418,7 @@ const HomePage = () => {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">{conv.subtitle}</p>
+                    <p className="text-sm text-muted-foreground truncate">{conv.lastMessage || 'No messages yet'}</p>
                   </div>
                 </button>
               );
@@ -429,6 +442,15 @@ const HomePage = () => {
                 <DialogTitle>Create Group</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-4">
+                {/* Group Avatar Upload */}
+                <div className="flex justify-center">
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center border-2 border-dashed border-border">
+                      <Camera className="w-8 h-8 text-muted-foreground" />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2 text-center">Add photo</p>
+                  </div>
+                </div>
                 <Input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group name" className="bg-input" />
                 <Input value={newGroupDesc} onChange={(e) => setNewGroupDesc(e.target.value)} placeholder="Description (optional)" className="bg-input" />
                 <Button onClick={handleCreateGroup} disabled={!newGroupName.trim() || creating} className="w-full">
@@ -470,6 +492,15 @@ const HomePage = () => {
                 <DialogTitle>Create Channel</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-4">
+                {/* Channel Avatar Upload */}
+                <div className="flex justify-center">
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center border-2 border-dashed border-border">
+                      <Camera className="w-8 h-8 text-muted-foreground" />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2 text-center">Add photo</p>
+                  </div>
+                </div>
                 <Input value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} placeholder="Channel name" className="bg-input" />
                 <Input value={newChannelDesc} onChange={(e) => setNewChannelDesc(e.target.value)} placeholder="Description (optional)" className="bg-input" />
                 <Button onClick={handleCreateChannel} disabled={!newChannelName.trim() || creating} className="w-full">

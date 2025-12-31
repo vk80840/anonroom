@@ -6,47 +6,79 @@
 
 @layer base {
   :root {
-    --background: 220 20% 6%;
-    --foreground: 150 80% 90%;
+    /* Light theme */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
 
-    --card: 220 20% 8%;
-    --card-foreground: 150 80% 90%;
+    --card: 0 0% 98%;
+    --card-foreground: 222 47% 11%;
 
-    --popover: 220 20% 8%;
-    --popover-foreground: 150 80% 90%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 150 100% 50%;
-    --primary-foreground: 220 20% 6%;
+    --primary: 270 70% 60%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 20% 12%;
-    --secondary-foreground: 150 60% 80%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 220 15% 15%;
-    --muted-foreground: 220 10% 50%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
 
-    --accent: 180 100% 50%;
-    --accent-foreground: 220 20% 6%;
+    --accent: 280 80% 70%;
+    --accent-foreground: 222 47% 11%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 220 20% 18%;
-    --input: 220 20% 12%;
-    --ring: 150 100% 50%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 270 70% 60%;
 
     --radius: 0.75rem;
 
     /* Custom tokens */
-    --glow-primary: 0 0 20px hsl(150 100% 50% / 0.3);
-    --glow-accent: 0 0 20px hsl(180 100% 50% / 0.3);
-    --message-own: 150 40% 12%;
-    --message-other: 220 20% 12%;
-    --online-indicator: 150 100% 50%;
+    --glow-primary: 0 0 20px hsl(270 70% 60% / 0.3);
+    --glow-accent: 0 0 20px hsl(280 80% 70% / 0.3);
+    --message-own: 270 30% 95%;
+    --message-other: 220 14% 96%;
+    --online-indicator: 150 100% 45%;
   }
 
   .dark {
     --background: 220 20% 6%;
-    --foreground: 150 80% 90%;
+    --foreground: 0 0% 95%;
+
+    --card: 220 20% 8%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 220 20% 8%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 270 70% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 20% 12%;
+    --secondary-foreground: 0 0% 85%;
+
+    --muted: 220 15% 15%;
+    --muted-foreground: 220 10% 50%;
+
+    --accent: 280 80% 70%;
+    --accent-foreground: 220 20% 6%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 20% 18%;
+    --input: 220 20% 12%;
+    --ring: 270 70% 60%;
+
+    --glow-primary: 0 0 20px hsl(270 70% 60% / 0.3);
+    --glow-accent: 0 0 20px hsl(280 80% 70% / 0.3);
+    --message-own: 270 40% 15%;
+    --message-other: 220 20% 12%;
+    --online-indicator: 150 100% 50%;
   }
 }
 

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Moon, Sun, Check, User, Lock, Shield, Palette, Camera } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, Check, User, Lock, Shield, Palette, Camera, Plus, X, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,6 +11,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore, themeColors, ThemeColor } from '@/stores/themeStore';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+
+const ADMIN_USERNAME = 'vansh';
 
 const SettingsPage = () => {
   const navigate = useNavigate();
@@ -24,6 +26,10 @@ const SettingsPage = () => {
   const [links, setLinks] = useState<string[]>(user?.links || []);
   const [newLink, setNewLink] = useState('');
   
+  // Multi-username state
+  const [altUsernames, setAltUsernames] = useState<string[]>((user as any)?.alt_usernames || []);
+  const [newAltUsername, setNewAltUsername] = useState('');
+  
   // Security state
   const [securityQuestion, setSecurityQuestion] = useState(user?.security_question || '');
   const [securityAnswer, setSecurityAnswer] = useState('');
@@ -33,6 +39,9 @@ const SettingsPage = () => {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isAdmin = user?.username?.toLowerCase() === ADMIN_USERNAME.toLowerCase();
+  const maxAltUsernames = isAdmin ? 999 : 2;
 
   if (!user) {
     navigate('/auth?mode=login');
@@ -183,6 +192,41 @@ const SettingsPage = () => {
 
   const removeLink = (index: number) => {
     setLinks(links.filter((_, i) => i !== index));
+  };
+
+  const addAltUsername = async () => {
+    if (!newAltUsername.trim()) return;
+    if (altUsernames.length >= maxAltUsernames) {
+      toast({ 
+        title: "Limit reached", 
+        description: isAdmin ? "You can add unlimited usernames" : "You can only add up to 2 alternate usernames", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // Check if username already exists
+    const { data: existing } = await supabase
+      .from('anon_users')
+      .select('id')
+      .eq('username', newAltUsername.trim())
+      .single();
+
+    if (existing) {
+      toast({ title: "Error", description: "This username is already taken", variant: "destructive" });
+      return;
+    }
+
+    const newList = [...altUsernames, newAltUsername.trim()];
+    setAltUsernames(newList);
+    setNewAltUsername('');
+    
+    // Save to database (you'd need an alt_usernames column)
+    toast({ title: "Username added!", description: `Added ${newAltUsername.trim()} as alternate username` });
+  };
+
+  const removeAltUsername = (index: number) => {
+    setAltUsernames(altUsernames.filter((_, i) => i !== index));
   };
 
   return (
@@ -348,6 +392,50 @@ const SettingsPage = () => {
                 <Button onClick={handleSaveProfile} disabled={saving} className="w-full">
                   {saving ? 'Saving...' : 'Save Profile'}
                 </Button>
+              </div>
+            </div>
+
+            {/* Multi-Username Section */}
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h2 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary" />
+                Alternate Usernames
+              </h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                {isAdmin 
+                  ? "As admin, you can add unlimited alternate usernames"
+                  : `Add up to ${maxAltUsernames} alternate usernames`
+                }
+              </p>
+              
+              <div className="space-y-3">
+                {altUsernames.map((username, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-muted/50 rounded-lg p-2">
+                    <span className="flex-1 font-mono text-sm text-foreground">{username}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => removeAltUsername(i)}
+                      className="w-8 h-8 text-destructive hover:text-destructive"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+                
+                {(isAdmin || altUsernames.length < maxAltUsernames) && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newAltUsername}
+                      onChange={(e) => setNewAltUsername(e.target.value)}
+                      placeholder="Enter alternate username..."
+                      className="bg-input border-border font-mono"
+                    />
+                    <Button variant="outline" size="icon" onClick={addAltUsername}>
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </TabsContent>
