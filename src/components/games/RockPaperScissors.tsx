@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface RockPaperScissorsProps {
   onClose: () => void;
   player1: string;
   player2?: string;
+  currentUserId: string;
+  player1Id: string;
+  player2Id?: string;
 }
 
 type Choice = 'rock' | 'paper' | 'scissors' | null;
@@ -15,7 +19,7 @@ const choices: { id: Choice; emoji: string; beats: Choice }[] = [
   { id: 'scissors', emoji: '✂️', beats: 'paper' },
 ];
 
-const RockPaperScissors = ({ onClose, player1, player2 = 'Player 2' }: RockPaperScissorsProps) => {
+const RockPaperScissors = ({ onClose, player1, player2 = 'Player 2', currentUserId, player1Id, player2Id }: RockPaperScissorsProps) => {
   const [player1Choice, setPlayer1Choice] = useState<Choice>(null);
   const [player2Choice, setPlayer2Choice] = useState<Choice>(null);
   const [currentPlayer, setCurrentPlayer] = useState<1 | 2>(1);
@@ -29,8 +33,15 @@ const RockPaperScissors = ({ onClose, player1, player2 = 'Player 2' }: RockPaper
     return p1Data.beats === p2 ? 'player1' : 'player2';
   };
 
+  // Check if it's the current user's turn
+  const isMyTurn = () => {
+    if (currentPlayer === 1 && currentUserId === player1Id) return true;
+    if (currentPlayer === 2 && currentUserId === player2Id) return true;
+    return false;
+  };
+
   const play = (choice: Choice) => {
-    if (!choice) return;
+    if (!choice || !isMyTurn()) return;
     
     if (currentPlayer === 1) {
       setPlayer1Choice(choice);
@@ -60,6 +71,7 @@ const RockPaperScissors = ({ onClose, player1, player2 = 'Player 2' }: RockPaper
   };
 
   const currentPlayerName = currentPlayer === 1 ? player1 : player2;
+  const waitingForOpponent = !isMyTurn() && !result;
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 max-w-xs mx-auto">
@@ -76,10 +88,16 @@ const RockPaperScissors = ({ onClose, player1, player2 = 'Player 2' }: RockPaper
       
       {!result ? (
         <>
-          <p className="text-center text-sm mb-3 text-foreground font-medium">
-            {currentPlayerName}'s turn to choose
+          <p className={cn(
+            "text-center text-sm mb-3 font-medium",
+            waitingForOpponent ? "text-muted-foreground" : "text-primary"
+          )}>
+            {waitingForOpponent 
+              ? `Waiting for ${currentPlayerName}...`
+              : "Your turn to choose"
+            }
           </p>
-          {player1Choice && (
+          {player1Choice && currentPlayer === 2 && (
             <p className="text-center text-xs text-muted-foreground mb-2">
               {player1} has chosen (hidden)
             </p>
@@ -89,7 +107,13 @@ const RockPaperScissors = ({ onClose, player1, player2 = 'Player 2' }: RockPaper
               <button
                 key={c.id}
                 onClick={() => play(c.id)}
-                className="w-16 h-16 text-3xl rounded-xl border-2 border-border hover:border-primary hover:bg-primary/10 transition-all"
+                disabled={!isMyTurn()}
+                className={cn(
+                  "w-16 h-16 text-3xl rounded-xl border-2 border-border transition-all",
+                  isMyTurn() 
+                    ? "hover:border-primary hover:bg-primary/10" 
+                    : "opacity-50 cursor-not-allowed"
+                )}
               >
                 {c.emoji}
               </button>

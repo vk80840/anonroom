@@ -8,6 +8,7 @@ import { useSoundEffects } from '@/hooks/useSoundEffects';
 
 interface GameSelectorProps {
   playerName: string;
+  playerId: string;
   onSendMessage?: (message: string) => void;
   onGameStart?: () => void;
   onGameEnd?: () => void;
@@ -26,7 +27,7 @@ interface GameSelectorInternalProps extends GameSelectorProps {
   setActiveGame: (game: GameType) => void;
 }
 
-export const GameDisplay = ({ playerName, onSendMessage, activeGame, setActiveGame }: GameSelectorInternalProps) => {
+export const GameDisplay = ({ playerName, playerId, activeGame, setActiveGame }: GameSelectorInternalProps) => {
   const closeGame = () => {
     setActiveGame('none');
   };
@@ -42,20 +43,20 @@ export const GameDisplay = ({ playerName, onSendMessage, activeGame, setActiveGa
           </Button>
         </div>
         {activeGame === 'tictactoe' && (
-          <TicTacToe onClose={closeGame} player1={playerName} />
+          <TicTacToe onClose={closeGame} player1={playerName} currentUserId={playerId} player1Id={playerId} />
         )}
         {activeGame === 'rps' && (
-          <RockPaperScissors onClose={closeGame} player1={playerName} />
+          <RockPaperScissors onClose={closeGame} player1={playerName} currentUserId={playerId} player1Id={playerId} />
         )}
         {activeGame === 'memory' && (
-          <MemoryGame onClose={closeGame} player1={playerName} />
+          <MemoryGame onClose={closeGame} player1={playerName} currentUserId={playerId} player1Id={playerId} />
         )}
       </div>
     </div>
   );
 };
 
-const GameSelector = ({ playerName, onSendMessage, onGameStart, onGameEnd }: GameSelectorProps) => {
+const GameSelector = ({ playerName, playerId, onSendMessage, onGameStart, onGameEnd }: GameSelectorProps) => {
   const [showGames, setShowGames] = useState(false);
   const [activeGame, setActiveGame] = useState<GameType>('none');
   const { playClick } = useSoundEffects();
@@ -76,17 +77,16 @@ const GameSelector = ({ playerName, onSendMessage, onGameStart, onGameEnd }: Gam
 
   return (
     <>
-      {/* Game Display - Renders above the input area in chat */}
       {activeGame !== 'none' && (
         <GameDisplay 
           playerName={playerName}
+          playerId={playerId}
           onSendMessage={onSendMessage}
           activeGame={activeGame}
           setActiveGame={handleCloseGame as any}
         />
       )}
       
-      {/* Game Button */}
       <div className="relative">
         <Button
           variant="ghost"
