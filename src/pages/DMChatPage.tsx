@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
-import { useSettingsStore } from '@/stores/settingsStore';
+import { useSettingsStore, chatWallpapers } from '@/stores/settingsStore';
 import { useToast } from '@/hooks/use-toast';
 import { AnonUser, DirectMessage } from '@/types/database';
 import MessageBubble from '@/components/chat/MessageBubble';
@@ -43,7 +43,7 @@ const DMChatPage = () => {
   const { recipientId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { useInAppKeyboard } = useSettingsStore();
+  const { useInAppKeyboard, chatWallpaper, chatWallpaperSize } = useSettingsStore();
   const { toast } = useToast();
   const { playSend, playNotification, playClick } = useSoundEffects();
   
@@ -58,6 +58,16 @@ const DMChatPage = () => {
   const [showKeyboard, setShowKeyboard] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Get wallpaper style
+  const getWallpaperStyle = () => {
+    const wallpaper = chatWallpapers.find(w => w.id === chatWallpaper);
+    if (!wallpaper || wallpaper.id === 'none') return {};
+    return {
+      backgroundImage: wallpaper.value,
+      backgroundSize: chatWallpaperSize || 'cover',
+    };
+  };
 
   // Create a consistent context ID for DM games
   const getContextId = () => {
@@ -267,24 +277,43 @@ const DMChatPage = () => {
   ].sort((a, b) => a.time - b.time);
 
   return (
-    <div className="h-screen bg-background flex flex-col">
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm px-4 py-3 flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-muted-foreground hover:text-foreground">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* Fixed Header */}
+      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md px-4 py-3 flex items-center gap-3 shrink-0">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => navigate('/')} 
+          className="text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
-          <User className="w-5 h-5 text-accent" />
-        </div>
-        <div>
-          <h1 className="font-mono font-semibold text-foreground">{recipient.username}</h1>
-          <p className="text-xs text-muted-foreground">Direct message</p>
-        </div>
+        <button 
+          onClick={() => navigate(`/profile/${recipientId}`)}
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+        >
+          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border-2 border-primary/30">
+            {recipient.avatar_url ? (
+              <img src={recipient.avatar_url} alt={recipient.username} className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-5 h-5 text-primary" />
+            )}
+          </div>
+          <div className="text-left">
+            <h1 className="font-mono font-semibold text-foreground">{recipient.username}</h1>
+            <p className="text-xs text-muted-foreground">Tap for profile</p>
+          </div>
+        </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4">
+      {/* Chat area with wallpaper */}
+      <main 
+        className="flex-1 overflow-y-auto p-4"
+        style={getWallpaperStyle()}
+      >
         <div className="max-w-3xl mx-auto space-y-3">
           {allItems.length === 0 ? (
-            <div className="text-center py-12">
+            <div className="text-center py-12 bg-background/60 backdrop-blur-sm rounded-2xl">
               <User className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
               <p className="text-muted-foreground mb-2">Start a conversation with {recipient.username}</p>
             </div>

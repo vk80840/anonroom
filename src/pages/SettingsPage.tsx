@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Moon, Sun, Check, User, Lock, Shield, Palette, Camera, Plus, X, Users, Keyboard } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, Check, User, Lock, Shield, Palette, Camera, Plus, X, Users, Keyboard, Image, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore, themeColors, ThemeColor } from '@/stores/themeStore';
-import { useSettingsStore } from '@/stores/settingsStore';
+import { useSettingsStore, chatWallpapers } from '@/stores/settingsStore';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -19,7 +19,7 @@ const SettingsPage = () => {
   const navigate = useNavigate();
   const { user, setUser } = useAuthStore();
   const { theme, color, setTheme, setColor } = useThemeStore();
-  const { useInAppKeyboard, setUseInAppKeyboard } = useSettingsStore();
+  const { useInAppKeyboard, setUseInAppKeyboard, chatWallpaper, setChatWallpaper } = useSettingsStore();
   const { toast } = useToast();
 
   // Profile state
@@ -233,7 +233,12 @@ const SettingsPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm px-4 py-3 flex items-center gap-3">
+      {/* Decorative header */}
+      <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-br from-primary/20 via-accent/10 to-transparent pointer-events-none" />
+      <div className="absolute top-10 right-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-20 left-20 w-24 h-24 bg-accent/10 rounded-full blur-2xl pointer-events-none" />
+      
+      <header className="relative border-b border-border bg-card/50 backdrop-blur-md px-4 py-3 flex items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
@@ -242,10 +247,15 @@ const SettingsPage = () => {
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <h1 className="font-semibold text-foreground">Settings</h1>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-primary" />
+          </div>
+          <h1 className="font-semibold text-foreground">Settings</h1>
+        </div>
       </header>
 
-      <main className="max-w-2xl mx-auto p-4">
+      <main className="relative max-w-2xl mx-auto p-4">
         <Tabs defaultValue="appearance" className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="appearance" className="gap-2">
@@ -264,12 +274,27 @@ const SettingsPage = () => {
 
           {/* Appearance Tab */}
           <TabsContent value="appearance" className="space-y-6">
-            <div className="bg-card border border-border rounded-xl p-6">
-              <h2 className="font-semibold text-foreground mb-4">Theme Mode</h2>
+            {/* Theme Mode Card */}
+            <div className="bg-card border border-border rounded-xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-primary/5 rounded-full blur-xl" />
+              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                {theme === 'dark' ? <Moon className="w-5 h-5 text-primary" /> : <Sun className="w-5 h-5 text-primary" />}
+                Theme Mode
+              </h2>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {theme === 'dark' ? <Moon className="w-5 h-5 text-primary" /> : <Sun className="w-5 h-5 text-primary" />}
-                  <span className="text-foreground">{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</span>
+                  <div className={cn(
+                    "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
+                    theme === 'dark' ? 'bg-primary/20' : 'bg-amber-500/20'
+                  )}>
+                    {theme === 'dark' ? <Moon className="w-6 h-6 text-primary" /> : <Sun className="w-6 h-6 text-amber-500" />}
+                  </div>
+                  <div>
+                    <span className="text-foreground font-medium">{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</span>
+                    <p className="text-xs text-muted-foreground">
+                      {theme === 'dark' ? 'Easy on the eyes' : 'Bright and clear'}
+                    </p>
+                  </div>
                 </div>
                 <Switch
                   checked={theme === 'dark'}
@@ -278,8 +303,12 @@ const SettingsPage = () => {
               </div>
             </div>
 
+            {/* Accent Color Card */}
             <div className="bg-card border border-border rounded-xl p-6">
-              <h2 className="font-semibold text-foreground mb-4">Accent Color</h2>
+              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Palette className="w-5 h-5 text-primary" />
+                Accent Color
+              </h2>
               <div className="grid grid-cols-3 gap-3">
                 {(Object.keys(themeColors) as ThemeColor[]).map((colorKey) => (
                   <button
@@ -287,11 +316,11 @@ const SettingsPage = () => {
                     onClick={() => setColor(colorKey)}
                     className={cn(
                       "relative flex items-center gap-3 p-3 rounded-lg border-2 transition-all",
-                      color === colorKey ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
+                      color === colorKey ? "border-primary bg-primary/10 shadow-lg" : "border-border hover:border-primary/50"
                     )}
                   >
                     <div
-                      className="w-8 h-8 rounded-full"
+                      className="w-8 h-8 rounded-full shadow-inner"
                       style={{ backgroundColor: `hsl(${themeColors[colorKey].primary})` }}
                     />
                     <span className="text-sm font-medium text-foreground">{themeColors[colorKey].name}</span>
@@ -303,6 +332,51 @@ const SettingsPage = () => {
               </div>
             </div>
 
+            {/* Chat Wallpaper Card */}
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Image className="w-5 h-5 text-primary" />
+                Chat Wallpaper
+              </h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Choose a background for your chat conversations
+              </p>
+              <div className="grid grid-cols-4 gap-3">
+                {chatWallpapers.map((wallpaper) => (
+                  <button
+                    key={wallpaper.id}
+                    onClick={() => setChatWallpaper(wallpaper.id)}
+                    className={cn(
+                      "relative aspect-[3/4] rounded-xl border-2 overflow-hidden transition-all",
+                      chatWallpaper === wallpaper.id 
+                        ? "border-primary ring-2 ring-primary/30" 
+                        : "border-border hover:border-primary/50"
+                    )}
+                  >
+                    <div 
+                      className="absolute inset-0"
+                      style={wallpaper.id === 'none' 
+                        ? { backgroundColor: 'hsl(var(--background))' }
+                        : { 
+                            backgroundImage: wallpaper.value,
+                            backgroundSize: wallpaper.size || 'cover'
+                          }
+                      }
+                    />
+                    {chatWallpaper === wallpaper.id && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
+                        <Check className="w-5 h-5 text-primary" />
+                      </div>
+                    )}
+                    <span className="absolute bottom-1 left-1 right-1 text-[10px] text-center text-foreground bg-background/80 rounded px-1 py-0.5 truncate">
+                      {wallpaper.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Keyboard Settings Card */}
             <div className="bg-card border border-border rounded-xl p-6">
               <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                 <Keyboard className="w-5 h-5 text-primary" />
@@ -310,7 +384,7 @@ const SettingsPage = () => {
               </h2>
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-foreground">Use In-App Keyboard</span>
+                  <span className="text-foreground font-medium">Use In-App Keyboard</span>
                   <p className="text-xs text-muted-foreground">Enable custom keyboard instead of device keyboard</p>
                 </div>
                 <Switch
