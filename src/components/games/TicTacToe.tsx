@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -9,12 +9,34 @@ interface TicTacToeProps {
   currentUserId: string;
   player1Id: string;
   player2Id?: string;
+  gameState?: { board: (string | null)[]; isPlayer1Turn: boolean };
+  onStateChange?: (state: { board: (string | null)[]; isPlayer1Turn: boolean }) => void;
+  onGameEnd?: (winnerId: string | null) => void;
+  isDisabled?: boolean;
 }
 
-const TicTacToe = ({ onClose, player1, player2 = 'Player 2', currentUserId, player1Id, player2Id }: TicTacToeProps) => {
-  const [board, setBoard] = useState<(string | null)[]>(Array(9).fill(null));
-  const [isPlayer1Turn, setIsPlayer1Turn] = useState(true);
+const TicTacToe = ({ 
+  onClose, 
+  player1, 
+  player2 = 'Player 2', 
+  currentUserId, 
+  player1Id, 
+  player2Id,
+  gameState,
+  onStateChange,
+  onGameEnd,
+  isDisabled = false
+}: TicTacToeProps) => {
+  const [board, setBoard] = useState<(string | null)[]>(gameState?.board || Array(9).fill(null));
+  const [isPlayer1Turn, setIsPlayer1Turn] = useState(gameState?.isPlayer1Turn ?? true);
   const [gameOver, setGameOver] = useState(false);
+
+  useEffect(() => {
+    if (gameState) {
+      setBoard(gameState.board || Array(9).fill(null));
+      setIsPlayer1Turn(gameState.isPlayer1Turn ?? true);
+    }
+  }, [gameState]);
 
   const calculateWinner = (squares: (string | null)[]) => {
     const lines = [
@@ -33,40 +55,53 @@ const TicTacToe = ({ onClose, player1, player2 = 'Player 2', currentUserId, play
   const winner = calculateWinner(board);
   const isDraw = !winner && board.every(cell => cell !== null);
 
-  // Check if it's the current user's turn
   const isMyTurn = () => {
+    if (isDisabled) return false;
     if (isPlayer1Turn && currentUserId === player1Id) return true;
     if (!isPlayer1Turn && currentUserId === player2Id) return true;
     return false;
   };
 
   const handleClick = (i: number) => {
-    if (board[i] || winner || gameOver) return;
-    
-    // Only allow move if it's the current user's turn
+    if (board[i] || winner || gameOver || isDisabled) return;
     if (!isMyTurn()) return;
     
     const newBoard = [...board];
     newBoard[i] = isPlayer1Turn ? 'X' : 'O';
-    setBoard(newBoard);
-    setIsPlayer1Turn(!isPlayer1Turn);
+    const newIsPlayer1Turn = !isPlayer1Turn;
     
-    if (calculateWinner(newBoard) || newBoard.every(cell => cell !== null)) {
+    setBoard(newBoard);
+    setIsPlayer1Turn(newIsPlayer1Turn);
+    
+    onStateChange?.({ board: newBoard, isPlayer1Turn: newIsPlayer1Turn });
+    
+    const newWinner = calculateWinner(newBoard);
+    if (newWinner || newBoard.every(cell => cell !== null)) {
       setGameOver(true);
+      if (newWinner) {
+        const winnerId = newWinner === 'X' ? player1Id : player2Id;
+        onGameEnd?.(winnerId || null);
+      } else {
+        onGameEnd?.(null);
+      }
     }
   };
 
   const resetGame = () => {
-    setBoard(Array(9).fill(null));
-    setIsPlayer1Turn(true);
+    const newState = { board: Array(9).fill(null), isPlayer1Turn: true };
+    setBoard(newState.board);
+    setIsPlayer1Turn(newState.isPlayer1Turn);
     setGameOver(false);
+    onStateChange?.(newState);
   };
 
   const currentPlayer = isPlayer1Turn ? player1 : player2;
   const winnerName = winner === 'X' ? player1 : player2;
-  const waitingForOpponent = !isMyTurn() && !winner && !isDraw;
+  const waitingForOpponent = !isMyTurn() && !winner && !isDraw && !isDisabled;
 
-  const status = winner 
+  const status = isDisabled
+    ? (winner ? `${winnerName} won!` : isDraw ? "It's a draw!" : 'Game ended')
+    : winner 
     ? `🎉 ${winnerName} wins!`
     : isDraw 
     ? "It's a draw!"
@@ -87,7 +122,7 @@ const TicTacToe = ({ onClose, player1, player2 = 'Player 2', currentUserId, play
       
       <p className={cn(
         "text-sm text-center mb-3",
-        waitingForOpponent ? "text-muted-foreground" : "text-primary font-medium"
+        waitingForOpponent || isDisabled ? "text-muted-foreground" : "text-primary font-medium"
       )}>
         {status}
       </p>
@@ -97,13 +132,13 @@ const TicTacToe = ({ onClose, player1, player2 = 'Player 2', currentUserId, play
           <button
             key={i}
             onClick={() => handleClick(i)}
-            disabled={!isMyTurn() || !!cell || !!winner || gameOver}
+            disabled={!isMyTurn() || !!cell || !!winner || gameOver || isDisabled}
             className={cn(
               "w-16 h-16 rounded-lg border-2 text-2xl font-bold transition-all",
               cell === 'X' ? 'text-primary border-primary/50 bg-primary/10' : 
               cell === 'O' ? 'text-accent border-accent/50 bg-accent/10' : 
               'border-border hover:border-primary/30 bg-background',
-              !isMyTurn() && !cell && 'opacity-50 cursor-not-allowed'
+              (!isMyTurn() || isDisabled) && !cell && 'opacity-50 cursor-not-allowed'
             )}
           >
             {cell}
@@ -111,7 +146,7 @@ const TicTacToe = ({ onClose, player1, player2 = 'Player 2', currentUserId, play
         ))}
       </div>
       
-      <Button onClick={resetGame} className="w-full">Play Again</Button>
+      {!isDisabled && <Button onClick={resetGame} className="w-full">Play Again</Button>}
     </div>
   );
 };

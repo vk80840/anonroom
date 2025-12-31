@@ -192,6 +192,48 @@ export type Database = {
           },
         ]
       }
+      game_sessions: {
+        Row: {
+          context_id: string
+          context_type: string
+          created_at: string
+          game_state: Json
+          game_type: string
+          id: string
+          player1_id: string
+          player2_id: string | null
+          status: string
+          updated_at: string
+          winner_id: string | null
+        }
+        Insert: {
+          context_id: string
+          context_type: string
+          created_at?: string
+          game_state?: Json
+          game_type: string
+          id?: string
+          player1_id: string
+          player2_id?: string | null
+          status?: string
+          updated_at?: string
+          winner_id?: string | null
+        }
+        Update: {
+          context_id?: string
+          context_type?: string
+          created_at?: string
+          game_state?: Json
+          game_type?: string
+          id?: string
+          player1_id?: string
+          player2_id?: string | null
+          status?: string
+          updated_at?: string
+          winner_id?: string | null
+        }
+        Relationships: []
+      }
       group_members: {
         Row: {
           group_id: string
