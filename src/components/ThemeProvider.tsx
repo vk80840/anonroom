@@ -11,13 +11,25 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
     
-    // Set color variables
+    // Set color variables based on theme
     const colors = themeColors[color];
-    root.style.setProperty('--primary', colors.primary);
-    root.style.setProperty('--accent', colors.accent);
+    const primaryValue = theme === 'light' ? colors.primaryLight : colors.primary;
+    const accentValue = theme === 'light' ? colors.accentLight : colors.accent;
     
-    // Update message colors based on primary
-    root.style.setProperty('--message-own', `${colors.primary.split(' ')[0]} 30% 15%`);
+    root.style.setProperty('--primary', primaryValue);
+    root.style.setProperty('--accent', accentValue);
+    root.style.setProperty('--ring', primaryValue);
+    
+    // Update glow effects
+    root.style.setProperty('--glow-primary', `0 0 20px hsl(${primaryValue} / 0.3)`);
+    root.style.setProperty('--glow-accent', `0 0 20px hsl(${accentValue} / 0.3)`);
+    
+    // Update message colors based on primary and theme
+    if (theme === 'light') {
+      root.style.setProperty('--message-own', `${primaryValue.split(' ')[0]} 30% 95%`);
+    } else {
+      root.style.setProperty('--message-own', `${primaryValue.split(' ')[0]} 30% 15%`);
+    }
     
   }, [theme, color]);
 
