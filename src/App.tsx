@@ -11,6 +11,7 @@ import ChatPage from "./pages/ChatPage";
 import DMChatPage from "./pages/DMChatPage";
 import ChannelChatPage from "./pages/ChannelChatPage";
 import SettingsPage from "./pages/SettingsPage";
+import ProfilePage from "./pages/ProfilePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/dm/:recipientId" element={<DMChatPage />} />
             <Route path="/channel/:channelId" element={<ChannelChatPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/profile/:userId" element={<ProfilePage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

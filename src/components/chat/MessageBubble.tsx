@@ -5,7 +5,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import SwipeableMessage from './SwipeableMessage';
+import MentionText from './MentionText';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
+import { useAuthStore } from '@/stores/authStore';
 
 interface MessageBubbleProps {
   id: string;
@@ -36,6 +38,7 @@ const MessageBubble = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(content);
   const { playClick, playSuccess } = useSoundEffects();
+  const { user } = useAuthStore();
 
   const handleSaveEdit = () => {
     if (editContent.trim() && editContent !== content) {
@@ -133,7 +136,9 @@ const MessageBubble = ({
               </Button>
             </div>
           ) : (
-            <p className="text-sm text-foreground leading-relaxed break-words">{content}</p>
+            <p className="text-sm text-foreground leading-relaxed break-words">
+              <MentionText content={content} currentUserId={user?.id} />
+            </p>
           )}
         </div>
 
