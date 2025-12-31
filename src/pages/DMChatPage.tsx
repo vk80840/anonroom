@@ -221,7 +221,10 @@ const DMChatPage = () => {
             <GameMessage
               gameType={activeGame}
               playerName={user.username}
+              playerId={user.id}
+              currentUserId={user.id}
               player2Name={recipient.username}
+              player2Id={recipient.id}
               onClose={() => setActiveGame('none')}
             />
           )}
