@@ -14,6 +14,9 @@ import GameMessageCard from '@/components/chat/GameMessageCard';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import InAppKeyboard from '@/components/keyboard/InAppKeyboard';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
+import MuteButton from '@/components/chat/MuteButton';
+import { useMutedChats } from '@/hooks/useMutedChats';
+import { useNotifications } from '@/hooks/useNotifications';
 
 interface DMWithReply extends DirectMessage {
   reply_to_id?: string | null;
@@ -46,6 +49,8 @@ const DMChatPage = () => {
   const { useInAppKeyboard, chatWallpaper, chatWallpaperSize } = useSettingsStore();
   const { toast } = useToast();
   const { playSend, playNotification, playClick } = useSoundEffects();
+  const { isMuted } = useMutedChats();
+  const { showLocalNotification, preferences } = useNotifications();
   
   const [recipient, setRecipient] = useState<AnonUser | null>(null);
   const [messages, setMessages] = useState<DMWithReply[]>([]);
@@ -99,7 +104,17 @@ const DMChatPage = () => {
                 }
                 return [...prev, { ...newMsg, replyTo }];
               });
-              if (newMsg.sender_id !== user.id) playNotification();
+              if (newMsg.sender_id !== user.id) {
+                playNotification();
+                // Show push notification if app is in background and chat is not muted
+                if (document.hidden && !isMuted('dm', recipientId) && preferences.messages_enabled) {
+                  showLocalNotification(
+                    recipient?.username || 'New Message',
+                    newMsg.content,
+                    `/dm/${recipientId}`
+                  );
+                }
+              }
               if (newMsg.receiver_id === user.id) markAsRead(newMsg.id);
             }
           } else if (payload.eventType === 'UPDATE') {
@@ -304,6 +319,9 @@ const DMChatPage = () => {
             <p className="text-xs text-muted-foreground">Tap for profile</p>
           </div>
         </button>
+        <div className="ml-auto">
+          <MuteButton chatType="dm" chatId={recipientId || ''} />
+        </div>
       </header>
 
       {/* Chat area with wallpaper */}

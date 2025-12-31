@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Moon, Sun, Check, User, Lock, Shield, Palette, Camera, Plus, X, Users, Keyboard, Image, Sparkles } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, Check, User, Lock, Shield, Palette, Camera, Plus, X, Users, Keyboard, Image, Sparkles, Bell, BellOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,6 +12,7 @@ import { useThemeStore, themeColors, ThemeColor } from '@/stores/themeStore';
 import { useSettingsStore, chatWallpapers } from '@/stores/settingsStore';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useNotifications } from '@/hooks/useNotifications';
 
 const ADMIN_USERNAME = 'vansh';
 
@@ -21,6 +22,15 @@ const SettingsPage = () => {
   const { theme, color, setTheme, setColor } = useThemeStore();
   const { useInAppKeyboard, setUseInAppKeyboard, chatWallpaper, setChatWallpaper } = useSettingsStore();
   const { toast } = useToast();
+  const { 
+    permission, 
+    isSupported, 
+    isSubscribed, 
+    preferences, 
+    requestPermission, 
+    unsubscribe, 
+    updatePreferences 
+  } = useNotifications();
 
   // Profile state
   const [bio, setBio] = useState(user?.bio || '');
@@ -257,18 +267,22 @@ const SettingsPage = () => {
 
       <main className="relative max-w-2xl mx-auto p-4">
         <Tabs defaultValue="appearance" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="appearance" className="gap-2">
               <Palette className="w-4 h-4" />
-              Theme
+              <span className="hidden sm:inline">Theme</span>
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-2">
+              <Bell className="w-4 h-4" />
+              <span className="hidden sm:inline">Alerts</span>
             </TabsTrigger>
             <TabsTrigger value="profile" className="gap-2">
               <User className="w-4 h-4" />
-              Profile
+              <span className="hidden sm:inline">Profile</span>
             </TabsTrigger>
             <TabsTrigger value="security" className="gap-2">
               <Lock className="w-4 h-4" />
-              Security
+              <span className="hidden sm:inline">Security</span>
             </TabsTrigger>
           </TabsList>
 
@@ -392,6 +406,133 @@ const SettingsPage = () => {
                   onCheckedChange={setUseInAppKeyboard}
                 />
               </div>
+            </div>
+          </TabsContent>
+
+          {/* Notifications Tab */}
+          <TabsContent value="notifications" className="space-y-6">
+            {/* Push Notifications Card */}
+            <div className="bg-card border border-border rounded-xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-primary/5 rounded-full blur-xl" />
+              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Bell className="w-5 h-5 text-primary" />
+                Push Notifications
+              </h2>
+              
+              {!isSupported ? (
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    Push notifications are not supported in this browser.
+                  </p>
+                </div>
+              ) : permission === 'denied' ? (
+                <div className="p-4 bg-destructive/10 rounded-lg">
+                  <p className="text-sm text-destructive">
+                    Notifications are blocked. Please enable them in your browser settings.
+                  </p>
+                </div>
+              ) : !isSubscribed ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Enable push notifications to receive alerts when you get new messages or game invites, even when the app is closed.
+                  </p>
+                  <Button 
+                    onClick={async () => {
+                      const success = await requestPermission();
+                      if (success) {
+                        toast({ title: "Notifications enabled!", description: "You'll now receive push notifications" });
+                      }
+                    }}
+                    className="w-full"
+                  >
+                    <Bell className="w-4 h-4 mr-2" />
+                    Enable Notifications
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-5 h-5 text-primary" />
+                      <span className="text-sm font-medium text-foreground">Notifications Enabled</span>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={async () => {
+                        await unsubscribe();
+                        toast({ title: "Notifications disabled", description: "You won't receive push notifications" });
+                      }}
+                    >
+                      Disable
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Notification Preferences Card */}
+            {isSubscribed && (
+              <div className="bg-card border border-border rounded-xl p-6">
+                <h2 className="font-semibold text-foreground mb-4">Notification Preferences</h2>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-foreground font-medium">Messages</span>
+                      <p className="text-xs text-muted-foreground">Get notified for new messages</p>
+                    </div>
+                    <Switch
+                      checked={preferences.messages_enabled}
+                      onCheckedChange={(checked) => updatePreferences({ messages_enabled: checked })}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-foreground font-medium">Games</span>
+                      <p className="text-xs text-muted-foreground">Get notified for game invites and moves</p>
+                    </div>
+                    <Switch
+                      checked={preferences.games_enabled}
+                      onCheckedChange={(checked) => updatePreferences({ games_enabled: checked })}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-foreground font-medium">Mentions</span>
+                      <p className="text-xs text-muted-foreground">Get notified when someone @mentions you</p>
+                    </div>
+                    <Switch
+                      checked={preferences.mentions_enabled}
+                      onCheckedChange={(checked) => updatePreferences({ mentions_enabled: checked })}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-foreground font-medium">Sounds</span>
+                      <p className="text-xs text-muted-foreground">Play sound for notifications</p>
+                    </div>
+                    <Switch
+                      checked={preferences.sound_enabled}
+                      onCheckedChange={(checked) => updatePreferences({ sound_enabled: checked })}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Muting Info Card */}
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h2 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                <BellOff className="w-5 h-5 text-primary" />
+                Muting Chats
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                You can mute specific chats by tapping the bell icon in the chat header. 
+                Muted chats won't send you notifications.
+              </p>
             </div>
           </TabsContent>
 
