@@ -6,9 +6,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/use-toast';
 import { Group, Message } from '@/types/database';
-import GameSelector from '@/components/games/GameSelector';
+import GameSelector, { GameDisplay } from '@/components/games/GameSelector';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ReplyPreview from '@/components/chat/ReplyPreview';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { useSoundEffects } from '@/hooks/useSoundEffects';
 
 interface MessageWithUser extends Message {
   username: string;
@@ -21,6 +23,7 @@ const ChatPage = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { toast } = useToast();
+  const { playSend, playNotification } = useSoundEffects();
   
   const [group, setGroup] = useState<Group | null>(null);
   const [messages, setMessages] = useState<MessageWithUser[]>([]);
@@ -29,6 +32,7 @@ const ChatPage = () => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<MessageWithUser | null>(null);
+  const [activeGame, setActiveGame] = useState<'none' | 'tictactoe' | 'rps' | 'memory'>('none');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -60,6 +64,7 @@ const ChatPage = () => {
               }
             }
             
+            if (newMsg.user_id !== user.id) playNotification();
             setMessages((prev) => [...prev, { ...newMsg, username: userData?.username || 'Unknown', replyTo }]);
           } else if (payload.eventType === 'UPDATE') {
             setMessages((prev) => prev.map(m => m.id === payload.new.id ? { ...m, content: payload.new.content } : m));
@@ -95,7 +100,7 @@ const ChatPage = () => {
       if (membersData) {
         const userIds = membersData.map(m => m.user_id);
         const { data: usersData } = await supabase.from('anon_users_public').select('id, username').in('id', userIds);
-        setMembers(usersData?.map(u => ({ user_id: u.id, username: u.username })) || []);
+        setMembers(usersData?.map(u => ({ user_id: u.id!, username: u.username! })) || []);
       }
 
       const { data: messagesData } = await supabase.from('messages').select('*').eq('group_id', groupId).order('created_at', { ascending: true });
@@ -131,6 +136,7 @@ const ChatPage = () => {
       
       const { error } = await supabase.from('messages').insert(insertData);
       if (error) throw error;
+      playSend();
       setNewMessage('');
       setReplyingTo(null);
     } catch (error: any) {
@@ -158,7 +164,11 @@ const ChatPage = () => {
   };
 
   if (!user || loading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">Loading...</p></div>;
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
   }
 
   if (!group) return null;
@@ -208,13 +218,28 @@ const ChatPage = () => {
         </div>
       </main>
 
+      {/* Game Display Area - Above input */}
+      {activeGame !== 'none' && (
+        <GameDisplay
+          playerName={user.username}
+          onSendMessage={(msg) => { supabase.from('messages').insert({ group_id: groupId, user_id: user.id, content: msg }); }}
+          activeGame={activeGame}
+          setActiveGame={setActiveGame as any}
+        />
+      )}
+
       <div className="border-t border-border bg-card/50 backdrop-blur-sm">
         {replyingTo && (
           <ReplyPreview username={replyingTo.username} content={replyingTo.content} onCancel={() => setReplyingTo(null)} />
         )}
         <div className="p-4">
           <div className="max-w-3xl mx-auto flex items-center gap-3">
-            <GameSelector playerName={user.username} onSendMessage={(msg) => { supabase.from('messages').insert({ group_id: groupId, user_id: user.id, content: msg }); }} />
+            <GameSelector 
+              playerName={user.username} 
+              onSendMessage={(msg) => { supabase.from('messages').insert({ group_id: groupId, user_id: user.id, content: msg }); }}
+              onGameStart={() => {}}
+              onGameEnd={() => {}}
+            />
             <input
               type="text"
               value={newMessage}

@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import SwipeableMessage from './SwipeableMessage';
+import { useSoundEffects } from '@/hooks/useSoundEffects';
 
 interface MessageBubbleProps {
   id: string;
@@ -33,10 +35,12 @@ const MessageBubble = ({
 }: MessageBubbleProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(content);
+  const { playClick, playSuccess } = useSoundEffects();
 
   const handleSaveEdit = () => {
     if (editContent.trim() && editContent !== content) {
       onEdit(editContent.trim());
+      playSuccess();
     }
     setIsEditing(false);
   };
@@ -46,7 +50,17 @@ const MessageBubble = ({
     setIsEditing(false);
   };
 
-  return (
+  const handleReply = () => {
+    playClick();
+    onReply();
+  };
+
+  const handleDelete = () => {
+    playClick();
+    onDelete();
+  };
+
+  const messageContent = (
     <div
       className={cn(
         'flex flex-col gap-1 max-w-[75%] message-appear group',
@@ -55,7 +69,7 @@ const MessageBubble = ({
     >
       <div className="flex items-center gap-2">
         <span className={cn('font-mono text-xs', isOwn ? 'text-primary' : 'text-accent')}>
-          {isOwn ? 'You' : username}
+          {username}
         </span>
         <span className="text-[10px] text-muted-foreground">
           {format(new Date(createdAt), 'HH:mm')}
@@ -75,7 +89,7 @@ const MessageBubble = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={onReply}>
+              <DropdownMenuItem onClick={handleReply}>
                 <Reply className="w-4 h-4 mr-2" />
                 Reply
               </DropdownMenuItem>
@@ -135,15 +149,15 @@ const MessageBubble = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onReply}>
+              <DropdownMenuItem onClick={handleReply}>
                 <Reply className="w-4 h-4 mr-2" />
                 Reply
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setIsEditing(true)}>
+              <DropdownMenuItem onClick={() => { playClick(); setIsEditing(true); }}>
                 <Pencil className="w-4 h-4 mr-2" />
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDelete} className="text-destructive">
+              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete
               </DropdownMenuItem>
@@ -152,6 +166,12 @@ const MessageBubble = ({
         )}
       </div>
     </div>
+  );
+
+  return (
+    <SwipeableMessage onSwipeReply={onReply}>
+      {messageContent}
+    </SwipeableMessage>
   );
 };
 

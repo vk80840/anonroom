@@ -361,7 +361,12 @@ const HomePage = () => {
       <main className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">Loading...</p>
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
+              <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary animate-spin" />
+              <div className="absolute inset-1 rounded-full bg-primary/10 animate-pulse" />
+              <div className="absolute inset-2 rounded-full bg-primary/20 animate-glow-pulse" />
+            </div>
           </div>
         ) : filteredConversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-8 text-center">

@@ -82,7 +82,7 @@ const AuthPage = () => {
           title: isLogin ? "Welcome back!" : "Account created!",
           description: `${isLogin ? 'Logged in as' : 'Welcome,'} ${data.user.username}`,
         });
-        navigate('/groups');
+        navigate('/');
       }
     } catch (error: any) {
       console.error('Auth error:', error);
