@@ -129,7 +129,7 @@ const MediaUpload = ({ onUpload, disabled }: MediaUploadProps) => {
           </Button>
 
           {showMenu && (
-            <div className="absolute bottom-12 left-0 bg-card border border-border rounded-xl p-2 shadow-lg z-50 min-w-36">
+            <div className="absolute bottom-12 left-0 bg-card border border-border rounded-xl p-2 shadow-lg z-50 min-w-36 animate-scale-in">
               <button
                 onClick={() => {
                   fileInputRef.current?.click();
