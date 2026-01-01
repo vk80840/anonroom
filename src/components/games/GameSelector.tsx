@@ -4,6 +4,9 @@ import { Gamepad2, X } from 'lucide-react';
 import TicTacToe from './TicTacToe';
 import RockPaperScissors from './RockPaperScissors';
 import MemoryGame from './MemoryGame';
+import SnakeGame from './SnakeGame';
+import Connect4 from './Connect4';
+import WordGuess from './WordGuess';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 
 interface GameSelectorProps {
@@ -14,12 +17,15 @@ interface GameSelectorProps {
   onGameEnd?: () => void;
 }
 
-type GameType = 'none' | 'tictactoe' | 'rps' | 'memory';
+type GameType = 'none' | 'tictactoe' | 'rps' | 'memory' | 'snake' | 'connect4' | 'wordguess';
 
 const games = [
   { id: 'tictactoe' as GameType, name: 'Tic Tac Toe', emoji: '⭕' },
   { id: 'rps' as GameType, name: 'Rock Paper Scissors', emoji: '✂️' },
   { id: 'memory' as GameType, name: 'Memory Match', emoji: '🧠' },
+  { id: 'snake' as GameType, name: 'Snake', emoji: '🐍' },
+  { id: 'connect4' as GameType, name: 'Connect 4', emoji: '🔴' },
+  { id: 'wordguess' as GameType, name: 'Word Guess', emoji: '📝' },
 ];
 
 interface GameSelectorInternalProps extends GameSelectorProps {
@@ -35,7 +41,7 @@ export const GameDisplay = ({ playerName, playerId, activeGame, setActiveGame }:
   if (activeGame === 'none') return null;
 
   return (
-    <div className="border-b border-border bg-card/30 p-4">
+    <div className="border-b border-border bg-card/30 p-4 animate-scale-in">
       <div className="max-w-3xl mx-auto">
         <div className="flex justify-end mb-2">
           <Button variant="ghost" size="icon" onClick={closeGame} className="w-8 h-8">
@@ -50,6 +56,15 @@ export const GameDisplay = ({ playerName, playerId, activeGame, setActiveGame }:
         )}
         {activeGame === 'memory' && (
           <MemoryGame onClose={closeGame} player1={playerName} currentUserId={playerId} player1Id={playerId} />
+        )}
+        {activeGame === 'snake' && (
+          <SnakeGame onClose={closeGame} player1={playerName} currentUserId={playerId} player1Id={playerId} />
+        )}
+        {activeGame === 'connect4' && (
+          <Connect4 onClose={closeGame} player1={playerName} currentUserId={playerId} player1Id={playerId} />
+        )}
+        {activeGame === 'wordguess' && (
+          <WordGuess onClose={closeGame} player1={playerName} currentUserId={playerId} player1Id={playerId} />
         )}
       </div>
     </div>
@@ -101,7 +116,7 @@ const GameSelector = ({ playerName, playerId, onSendMessage, onGameStart, onGame
         </Button>
         
         {showGames && (
-          <div className="absolute bottom-12 left-0 bg-card border border-border rounded-xl p-3 shadow-lg min-w-48 z-50">
+          <div className="absolute bottom-12 left-0 bg-card border border-border rounded-xl p-3 shadow-lg min-w-48 z-50 animate-scale-in">
             <p className="text-xs text-muted-foreground mb-2 font-semibold">Play a Game</p>
             <div className="space-y-1">
               {games.map(game => (

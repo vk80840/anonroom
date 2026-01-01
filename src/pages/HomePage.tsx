@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Users, Shield, Hash, Plus, Settings, Search, User, Camera, LogOut } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { MessageCircle, Users, Shield, Hash, Plus, Settings, Search, User, Camera, LogOut, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -11,6 +11,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
+import TelegramSidebar from '@/components/layout/TelegramSidebar';
+import FloatingActionButton from '@/components/layout/FloatingActionButton';
 
 interface Conversation {
   id: string;
@@ -24,6 +26,7 @@ interface Conversation {
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, logout } = useAuthStore();
   const { playClick } = useSoundEffects();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -31,6 +34,7 @@ const HomePage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<AnonUser[]>([]);
   const [searching, setSearching] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Create dialogs
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
@@ -42,6 +46,13 @@ const HomePage = () => {
   const [newChannelDesc, setNewChannelDesc] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [creating, setCreating] = useState(false);
+
+  // Handle URL actions
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'newgroup') setCreateGroupOpen(true);
+    if (action === 'newchannel') setCreateChannelOpen(true);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!user) {
@@ -330,27 +341,28 @@ const HomePage = () => {
 
   return (
     <div className="h-screen bg-background flex flex-col">
+      {/* Telegram-style Sidebar */}
+      <TelegramSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Shield className="w-6 h-6 text-primary" />
-          <span className="font-bold text-foreground">AnonChat</span>
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm px-4 py-3 flex items-center justify-between animate-slide-down">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setSidebarOpen(true)}
+            className="hover:bg-primary/10"
+          >
+            <Menu className="w-5 h-5" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <Shield className="w-6 h-6 text-primary" />
+            <span className="font-bold text-foreground">AnonChat</span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
             <Settings className="w-5 h-5" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => { 
-              playClick(); 
-              logout(); 
-              navigate('/auth?mode=login'); 
-            }}
-            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-          >
-            <LogOut className="w-5 h-5" />
           </Button>
         </div>
       </header>
@@ -403,22 +415,23 @@ const HomePage = () => {
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {filteredConversations.map(conv => {
+            {filteredConversations.map((conv, index) => {
               const Icon = getIcon(conv.type);
               return (
                 <button
                   key={`${conv.type}-${conv.id}`}
                   onClick={() => navigateToConversation(conv)}
-                  className="w-full flex items-center gap-3 p-4 hover:bg-primary/5 transition-colors text-left"
+                  className="w-full flex items-center gap-3 p-4 hover:bg-primary/5 active:bg-primary/10 transition-all text-left animate-slide-up"
+                  style={{ animationDelay: `${index * 30}ms` }}
                 >
-                  <div className={cn('w-12 h-12 rounded-full flex items-center justify-center relative overflow-hidden', getIconBg(conv.type))}>
+                  <div className={cn('w-12 h-12 rounded-full flex items-center justify-center relative overflow-hidden transition-transform hover:scale-105', getIconBg(conv.type))}>
                     {conv.avatarUrl ? (
                       <img src={conv.avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
                     ) : (
                       <Icon className="w-6 h-6" />
                     )}
                     {conv.unreadCount && conv.unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full text-xs flex items-center justify-center text-primary-foreground font-medium">
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full text-xs flex items-center justify-center text-primary-foreground font-medium animate-bounce">
                         {conv.unreadCount}
                       </span>
                     )}
@@ -441,90 +454,73 @@ const HomePage = () => {
         )}
       </main>
 
-      {/* Bottom Action Bar */}
-      <div className="border-t border-border bg-card/50 p-4">
-        <div className="flex justify-center gap-3">
-          <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Users className="w-4 h-4" />
-                New Group
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-card border-border">
-              <DialogHeader>
-                <DialogTitle>Create Group</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                {/* Group Avatar Upload */}
-                <div className="flex justify-center">
-                  <div className="relative">
-                    <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center border-2 border-dashed border-border">
-                      <Camera className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2 text-center">Add photo</p>
-                  </div>
-                </div>
-                <Input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group name" className="bg-input" />
-                <Input value={newGroupDesc} onChange={(e) => setNewGroupDesc(e.target.value)} placeholder="Description (optional)" className="bg-input" />
-                <Button onClick={handleCreateGroup} disabled={!newGroupName.trim() || creating} className="w-full">
-                  {creating ? 'Creating...' : 'Create'}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+      {/* Floating Action Button */}
+      <FloatingActionButton 
+        onNewGroup={() => setCreateGroupOpen(true)}
+        onNewChannel={() => setCreateChannelOpen(true)}
+        onNewDM={() => {}}
+      />
 
-          <Dialog open={joinGroupOpen} onOpenChange={setJoinGroupOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Join
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-card border-border">
-              <DialogHeader>
-                <DialogTitle>Join Group</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <Input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="Enter invite code" className="bg-input font-mono" />
-                <Button onClick={handleJoinGroup} disabled={!joinCode.trim() || creating} className="w-full">
-                  {creating ? 'Joining...' : 'Join'}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={createChannelOpen} onOpenChange={setCreateChannelOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Hash className="w-4 h-4" />
-                New Channel
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-card border-border">
-              <DialogHeader>
-                <DialogTitle>Create Channel</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                {/* Channel Avatar Upload */}
-                <div className="flex justify-center">
-                  <div className="relative">
-                    <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center border-2 border-dashed border-border">
-                      <Camera className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2 text-center">Add photo</p>
-                  </div>
+      {/* Dialogs (hidden triggers) */}
+      <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>
+        <DialogContent className="bg-card border-border animate-scale-in">
+          <DialogHeader>
+            <DialogTitle>Create Group</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="flex justify-center">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center border-2 border-dashed border-border hover:bg-primary/30 transition-colors cursor-pointer">
+                  <Camera className="w-8 h-8 text-muted-foreground" />
                 </div>
-                <Input value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} placeholder="Channel name" className="bg-input" />
-                <Input value={newChannelDesc} onChange={(e) => setNewChannelDesc(e.target.value)} placeholder="Description (optional)" className="bg-input" />
-                <Button onClick={handleCreateChannel} disabled={!newChannelName.trim() || creating} className="w-full">
-                  {creating ? 'Creating...' : 'Create'}
-                </Button>
+                <p className="text-xs text-muted-foreground mt-2 text-center">Add photo</p>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+            </div>
+            <Input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group name" className="bg-input" />
+            <Input value={newGroupDesc} onChange={(e) => setNewGroupDesc(e.target.value)} placeholder="Description (optional)" className="bg-input" />
+            <Button onClick={handleCreateGroup} disabled={!newGroupName.trim() || creating} className="w-full">
+              {creating ? 'Creating...' : 'Create'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={joinGroupOpen} onOpenChange={setJoinGroupOpen}>
+        <DialogContent className="bg-card border-border animate-scale-in">
+          <DialogHeader>
+            <DialogTitle>Join Group</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <Input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="Enter invite code" className="bg-input font-mono" />
+            <Button onClick={handleJoinGroup} disabled={!joinCode.trim() || creating} className="w-full">
+              {creating ? 'Joining...' : 'Join'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createChannelOpen} onOpenChange={setCreateChannelOpen}>
+        <DialogContent className="bg-card border-border animate-scale-in">
+          <DialogHeader>
+            <DialogTitle>Create Channel</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="flex justify-center">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center border-2 border-dashed border-border hover:bg-green-500/30 transition-colors cursor-pointer">
+                  <Camera className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2 text-center">Add photo</p>
+              </div>
+            </div>
+            <Input value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} placeholder="Channel name" className="bg-input" />
+            <Input value={newChannelDesc} onChange={(e) => setNewChannelDesc(e.target.value)} placeholder="Description (optional)" className="bg-input" />
+            <Button onClick={handleCreateChannel} disabled={!newChannelName.trim() || creating} className="w-full">
+              {creating ? 'Creating...' : 'Create'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

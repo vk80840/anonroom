@@ -406,7 +406,29 @@ const DMChatPage = () => {
           />
         ) : (
           <div className="p-4">
+            {/* Pending media preview */}
+            {pendingMedia && (
+              <div className="max-w-3xl mx-auto mb-3">
+                <div className="relative inline-block">
+                  {pendingMedia.type === 'image' ? (
+                    <img src={pendingMedia.url} alt="Upload preview" className="h-20 rounded-lg" />
+                  ) : (
+                    <video src={pendingMedia.url} className="h-20 rounded-lg" />
+                  )}
+                  <button 
+                    onClick={() => setPendingMedia(null)}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
+            
             <div className="max-w-3xl mx-auto flex items-center gap-3">
+              {/* Media upload */}
+              <MediaUpload onUpload={handleMediaUpload} />
+              
               {/* Game selector */}
               <div className="relative">
                 <Button
@@ -419,7 +441,7 @@ const DMChatPage = () => {
                 </Button>
                 
                 {showGameMenu && (
-                  <div className="absolute bottom-12 left-0 bg-card border border-border rounded-xl p-3 shadow-lg min-w-48 z-50">
+                  <div className="absolute bottom-12 left-0 bg-card border border-border rounded-xl p-3 shadow-lg min-w-48 z-50 animate-scale-in">
                     <p className="text-xs text-muted-foreground mb-2 font-semibold">Play a Game</p>
                     <div className="space-y-1">
                       {games.map(game => (
@@ -460,7 +482,7 @@ const DMChatPage = () => {
                 />
               )}
               
-              <Button onClick={handleSend} disabled={!newMessage.trim() || sending} className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 chat-glow">
+              <Button onClick={handleSend} disabled={(!newMessage.trim() && !pendingMedia) || sending} className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 chat-glow">
                 <Send className="w-5 h-5" />
               </Button>
             </div>
