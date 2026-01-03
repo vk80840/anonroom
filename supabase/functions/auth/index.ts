@@ -290,7 +290,7 @@ serve(async (req) => {
       const { data: newUser, error } = await supabase
         .from('anon_users')
         .insert({ username: username.toLowerCase(), password_hash: hashedPassword })
-        .select('id, username, created_at, last_seen_at, bio, birthday, links, security_question')
+        .select('id, username, created_at, last_seen_at, bio, birthday, links, security_question, avatar_url')
         .single();
 
       if (error) throw error;
@@ -306,7 +306,7 @@ serve(async (req) => {
       
       const { data: users, error } = await supabase
         .from('anon_users')
-        .select('id, username, password_hash, created_at, last_seen_at, bio, birthday, links, security_question')
+        .select('id, username, password_hash, created_at, last_seen_at, bio, birthday, links, security_question, avatar_url')
         .eq('username', username.toLowerCase())
         .limit(1);
 
@@ -348,6 +348,7 @@ serve(async (req) => {
             birthday: user.birthday,
             links: user.links,
             security_question: user.security_question,
+            avatar_url: user.avatar_url,
           }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -5,13 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
 import TicTacToe from '@/components/games/TicTacToe';
 import RockPaperScissors from '@/components/games/RockPaperScissors';
 import MemoryGame from '@/components/games/MemoryGame';
-import SnakeGame from '@/components/games/SnakeGame';
-import Connect4 from '@/components/games/Connect4';
-import WordGuess from '@/components/games/WordGuess';
 
 interface GameSession {
   id: string;
-  game_type: 'tictactoe' | 'rps' | 'memory' | 'snake' | 'connect4' | 'wordguess';
+  game_type: 'tictactoe' | 'rps' | 'memory';
   player1_id: string;
   player2_id: string | null;
   game_state: any;
@@ -32,18 +29,12 @@ const gameNames: Record<string, string> = {
   tictactoe: 'Tic Tac Toe',
   rps: 'Rock Paper Scissors',
   memory: 'Memory Match',
-  snake: 'Snake',
-  connect4: 'Connect 4',
-  wordguess: 'Word Guess',
 };
 
 const gameEmojis: Record<string, string> = {
   tictactoe: '⭕',
   rps: '✂️',
   memory: '🧠',
-  snake: '🐍',
-  connect4: '🔴',
-  wordguess: '📝',
 };
 
 const GameMessageCard = ({ 
@@ -193,37 +184,6 @@ const GameMessageCard = ({
               player2Id={gameSession.player2_id || ''}
               gameState={localGameState}
               onStateChange={handleGameStateChange}
-              onGameEnd={handleGameEnd}
-            />
-          )}
-          {gameSession.game_type === 'snake' && (
-            <SnakeGame
-              onClose={() => setIsExpanded(false)}
-              player1={player1Name}
-              currentUserId={currentUserId}
-              player1Id={gameSession.player1_id}
-              onGameEnd={handleGameEnd}
-            />
-          )}
-          {gameSession.game_type === 'connect4' && (
-            <Connect4
-              onClose={() => setIsExpanded(false)}
-              player1={player1Name}
-              player2={player2Name}
-              currentUserId={currentUserId}
-              player1Id={gameSession.player1_id}
-              player2Id={gameSession.player2_id || ''}
-              gameState={localGameState}
-              onStateChange={handleGameStateChange}
-              onGameEnd={handleGameEnd}
-            />
-          )}
-          {gameSession.game_type === 'wordguess' && (
-            <WordGuess
-              onClose={() => setIsExpanded(false)}
-              player1={player1Name}
-              currentUserId={currentUserId}
-              player1Id={gameSession.player1_id}
               onGameEnd={handleGameEnd}
             />
           )}

@@ -4,9 +4,6 @@ import { Gamepad2, X } from 'lucide-react';
 import TicTacToe from './TicTacToe';
 import RockPaperScissors from './RockPaperScissors';
 import MemoryGame from './MemoryGame';
-import SnakeGame from './SnakeGame';
-import Connect4 from './Connect4';
-import WordGuess from './WordGuess';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 
 interface GameSelectorProps {
@@ -17,15 +14,12 @@ interface GameSelectorProps {
   onGameEnd?: () => void;
 }
 
-type GameType = 'none' | 'tictactoe' | 'rps' | 'memory' | 'snake' | 'connect4' | 'wordguess';
+type GameType = 'none' | 'tictactoe' | 'rps' | 'memory';
 
 const games = [
   { id: 'tictactoe' as GameType, name: 'Tic Tac Toe', emoji: '⭕' },
   { id: 'rps' as GameType, name: 'Rock Paper Scissors', emoji: '✂️' },
   { id: 'memory' as GameType, name: 'Memory Match', emoji: '🧠' },
-  { id: 'snake' as GameType, name: 'Snake', emoji: '🐍' },
-  { id: 'connect4' as GameType, name: 'Connect 4', emoji: '🔴' },
-  { id: 'wordguess' as GameType, name: 'Word Guess', emoji: '📝' },
 ];
 
 interface GameSelectorInternalProps extends GameSelectorProps {
@@ -56,15 +50,6 @@ export const GameDisplay = ({ playerName, playerId, activeGame, setActiveGame }:
         )}
         {activeGame === 'memory' && (
           <MemoryGame onClose={closeGame} player1={playerName} currentUserId={playerId} player1Id={playerId} />
-        )}
-        {activeGame === 'snake' && (
-          <SnakeGame onClose={closeGame} player1={playerName} currentUserId={playerId} player1Id={playerId} />
-        )}
-        {activeGame === 'connect4' && (
-          <Connect4 onClose={closeGame} player1={playerName} currentUserId={playerId} player1Id={playerId} />
-        )}
-        {activeGame === 'wordguess' && (
-          <WordGuess onClose={closeGame} player1={playerName} currentUserId={playerId} player1Id={playerId} />
         )}
       </div>
     </div>

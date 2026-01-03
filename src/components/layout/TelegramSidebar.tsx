@@ -43,8 +43,7 @@ const TelegramSidebar = ({ isOpen, onClose }: TelegramSidebarProps) => {
     { icon: Users, label: 'New Group', action: () => navigate('/?action=newgroup') },
     { icon: Hash, label: 'New Channel', action: () => navigate('/?action=newchannel') },
     { icon: User, label: 'Contacts', action: () => navigate('/') },
-    { icon: Phone, label: 'Calls', action: () => {}, disabled: true, badge: 'Soon' },
-    { icon: Bookmark, label: 'Saved Messages', action: () => {}, disabled: true, badge: 'Soon' },
+    { icon: Plus, label: 'Add Account', action: () => navigate('/auth?mode=login'), badge: undefined },
     { icon: Settings, label: 'Settings', action: () => navigate('/settings') },
   ];
 
@@ -124,12 +123,8 @@ const TelegramSidebar = ({ isOpen, onClose }: TelegramSidebarProps) => {
           {menuItems.map((item, index) => (
             <button
               key={index}
-              onClick={() => !item.disabled && handleNavigation(item.action)}
-              disabled={item.disabled}
-              className={cn(
-                'w-full flex items-center gap-4 px-6 py-3.5 text-foreground hover:bg-primary/10 transition-colors',
-                item.disabled && 'opacity-50 cursor-not-allowed'
-              )}
+              onClick={() => handleNavigation(item.action)}
+              className="w-full flex items-center gap-4 px-6 py-3.5 text-foreground hover:bg-primary/10 transition-colors"
             >
               <item.icon className="w-5 h-5 text-muted-foreground" />
               <span className="flex-1 text-left text-sm font-medium">{item.label}</span>
@@ -144,23 +139,25 @@ const TelegramSidebar = ({ isOpen, onClose }: TelegramSidebarProps) => {
           <div className="h-px bg-border my-2 mx-4" />
 
           <button
-            onClick={() => handleNavigation(() => navigate('/?action=invite'))}
+            onClick={() => {
+              navigator.clipboard.writeText('https://anonroom.lovable.app');
+              onClose();
+            }}
             className="w-full flex items-center gap-4 px-6 py-3.5 text-foreground hover:bg-primary/10 transition-colors"
           >
             <Plus className="w-5 h-5 text-muted-foreground" />
             <span className="flex-1 text-left text-sm font-medium">Invite Friends</span>
           </button>
-
-          <button
-            onClick={() => {}}
-            className="w-full flex items-center gap-4 px-6 py-3.5 text-foreground hover:bg-primary/10 transition-colors opacity-50 cursor-not-allowed"
+          
+          <a
+            href="https://t.me/Anonroom_robot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center gap-4 px-6 py-3.5 text-foreground hover:bg-primary/10 transition-colors"
           >
-            <HelpCircle className="w-5 h-5 text-muted-foreground" />
-            <span className="flex-1 text-left text-sm font-medium">Help</span>
-            <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
-              Soon
-            </span>
-          </button>
+            <Bell className="w-5 h-5 text-muted-foreground" />
+            <span className="flex-1 text-left text-sm font-medium">Get Notifications (TG)</span>
+          </a>
         </div>
 
         {/* Footer */}

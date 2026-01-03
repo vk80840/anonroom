@@ -17,19 +17,16 @@ import { useSoundEffects } from '@/hooks/useSoundEffects';
 import MuteButton from '@/components/chat/MuteButton';
 import { useMutedChats } from '@/hooks/useMutedChats';
 import { useNotifications } from '@/hooks/useNotifications';
-import MediaUpload from '@/components/chat/MediaUpload';
-import MediaMessage from '@/components/chat/MediaMessage';
+import { useTelegramNotifications } from '@/hooks/useTelegramNotifications';
 
 interface DMWithReply extends DirectMessage {
   reply_to_id?: string | null;
   replyTo?: { content: string; username: string } | null;
-  media_url?: string | null;
-  media_type?: string | null;
 }
 
 interface GameSession {
   id: string;
-  game_type: 'tictactoe' | 'rps' | 'memory' | 'snake' | 'connect4' | 'wordguess';
+  game_type: 'tictactoe' | 'rps' | 'memory';
   player1_id: string;
   player2_id: string | null;
   game_state: any;
@@ -44,9 +41,6 @@ const games = [
   { id: 'tictactoe' as const, name: 'Tic Tac Toe', emoji: '⭕' },
   { id: 'rps' as const, name: 'Rock Paper Scissors', emoji: '✂️' },
   { id: 'memory' as const, name: 'Memory Match', emoji: '🧠' },
-  { id: 'snake' as const, name: 'Snake', emoji: '🐍' },
-  { id: 'connect4' as const, name: 'Connect 4', emoji: '🔴' },
-  { id: 'wordguess' as const, name: 'Word Guess', emoji: '📝' },
 ];
 
 const DMChatPage = () => {
@@ -58,6 +52,7 @@ const DMChatPage = () => {
   const { playSend, playNotification, playClick } = useSoundEffects();
   const { isMuted } = useMutedChats();
   const { showLocalNotification, preferences } = useNotifications();
+  const { sendNotification: sendTelegramNotification } = useTelegramNotifications();
   
   const [recipient, setRecipient] = useState<AnonUser | null>(null);
   const [messages, setMessages] = useState<DMWithReply[]>([]);
@@ -68,7 +63,6 @@ const DMChatPage = () => {
   const [replyingTo, setReplyingTo] = useState<DMWithReply | null>(null);
   const [showGameMenu, setShowGameMenu] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
-  const [pendingMedia, setPendingMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -218,27 +212,30 @@ const DMChatPage = () => {
   };
 
   const handleSend = async () => {
-    if ((!newMessage.trim() && !pendingMedia) || !user || !recipientId || sending) return;
+    if (!newMessage.trim() || !user || !recipientId || sending) return;
     setSending(true);
     try {
       const insertData: any = { 
         sender_id: user.id, 
         receiver_id: recipientId, 
-        content: newMessage.trim() || (pendingMedia ? `📷 ${pendingMedia.type === 'video' ? 'Video' : 'Photo'}` : '')
+        content: newMessage.trim()
       };
       if (replyingTo) insertData.reply_to_id = replyingTo.id;
-      if (pendingMedia) {
-        insertData.media_url = pendingMedia.url;
-        insertData.media_type = pendingMedia.type;
-      }
       
       const { error } = await supabase.from('direct_messages').insert(insertData);
       if (error) throw error;
+      
+      // Send Telegram notification to recipient
+      sendTelegramNotification(
+        recipientId,
+        `📩 Message from ${user.username}`,
+        newMessage.trim()
+      );
+      
       playSend();
       setNewMessage('');
       setReplyingTo(null);
       setShowKeyboard(false);
-      setPendingMedia(null);
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -246,9 +243,6 @@ const DMChatPage = () => {
     }
   };
 
-  const handleMediaUpload = (url: string, type: 'image' | 'video') => {
-    setPendingMedia({ url, type });
-  };
 
   const handleEdit = async (messageId: string, newContent: string) => {
     const { error } = await supabase.from('direct_messages').update({ content: newContent }).eq('id', messageId);
@@ -260,7 +254,7 @@ const DMChatPage = () => {
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
   };
 
-  const startGame = async (gameType: 'tictactoe' | 'rps' | 'memory' | 'snake' | 'connect4' | 'wordguess') => {
+  const startGame = async (gameType: 'tictactoe' | 'rps' | 'memory') => {
     playClick();
     setShowGameMenu(false);
     
@@ -406,29 +400,7 @@ const DMChatPage = () => {
           />
         ) : (
           <div className="p-4">
-            {/* Pending media preview */}
-            {pendingMedia && (
-              <div className="max-w-3xl mx-auto mb-3">
-                <div className="relative inline-block">
-                  {pendingMedia.type === 'image' ? (
-                    <img src={pendingMedia.url} alt="Upload preview" className="h-20 rounded-lg" />
-                  ) : (
-                    <video src={pendingMedia.url} className="h-20 rounded-lg" />
-                  )}
-                  <button 
-                    onClick={() => setPendingMedia(null)}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            )}
-            
             <div className="max-w-3xl mx-auto flex items-center gap-3">
-              {/* Media upload */}
-              <MediaUpload onUpload={handleMediaUpload} />
-              
               {/* Game selector */}
               <div className="relative">
                 <Button
@@ -482,7 +454,7 @@ const DMChatPage = () => {
                 />
               )}
               
-              <Button onClick={handleSend} disabled={(!newMessage.trim() && !pendingMedia) || sending} className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 chat-glow">
+              <Button onClick={handleSend} disabled={!newMessage.trim() || sending} className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 chat-glow">
                 <Send className="w-5 h-5" />
               </Button>
             </div>
