@@ -429,6 +429,33 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_connections: {
+        Row: {
+          connected_at: string
+          id: string
+          is_active: boolean
+          telegram_chat_id: number
+          telegram_username: string | null
+          user_id: string
+        }
+        Insert: {
+          connected_at?: string
+          id?: string
+          is_active?: boolean
+          telegram_chat_id: number
+          telegram_username?: string | null
+          user_id: string
+        }
+        Update: {
+          connected_at?: string
+          id?: string
+          is_active?: boolean
+          telegram_chat_id?: number
+          telegram_username?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       anon_users_public: {

@@ -64,10 +64,12 @@ const MentionText = ({ content, currentUserId }: MentionTextProps) => {
                   onMouseEnter={() => fetchUser(username)}
                   onClick={() => {
                     const user = userCache[username];
-                    if (user && user.id !== currentUserId) {
-                      navigate(`/dm/${user.id}`);
-                    } else if (user) {
+                    if (user) {
+                      // Always navigate to profile page directly
                       navigate(`/profile/${user.id}`);
+                    } else if (userCache[username] === null) {
+                      // User not found - already cached as null
+                      return;
                     }
                   }}
                 >

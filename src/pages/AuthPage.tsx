@@ -63,13 +63,25 @@ const AuthPage = () => {
       });
 
       if (error) {
-        throw new Error(error.message || 'Authentication failed');
+        console.error('Auth error:', error);
+        throw new Error('An error occurred. Please try again.');
       }
 
       if (data.error) {
+        // Don't expose internal errors - show user-friendly messages
+        let userMessage = data.error;
+        if (data.error.includes('password') || data.error.includes('Password')) {
+          userMessage = 'Incorrect password';
+        } else if (data.error.includes('not found') || data.error.includes('Not found')) {
+          userMessage = 'Username not found';
+        } else if (data.error.includes('taken') || data.error.includes('exists')) {
+          userMessage = 'Username already taken';
+        } else if (data.error.includes('Internal') || data.error.includes('error')) {
+          userMessage = 'An error occurred. Please try again.';
+        }
         toast({
           title: "Error",
-          description: data.error,
+          description: userMessage,
           variant: "destructive",
         });
         setLoading(false);
@@ -88,7 +100,7 @@ const AuthPage = () => {
       console.error('Auth error:', error);
       toast({
         title: "Error",
-        description: error.message || "Something went wrong",
+        description: "An error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
